@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Drone LogBook</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="theme-color" content="#0ea5e9" />
+</head>
+<body>
+  <header>
+    <h1>Drone LogBook</h1>
+    <p class="muted">Offline-first logbook. Choose Google or Microsoft.</p>
+  </header>
+
+  <section class="card">
+    <h2>Sign in</h2>
+    <div class="row">
+      <button id="btnGoogle">Sign in with Google</button>
+      <button id="btnMicrosoft">Sign in with Microsoft</button>
+    </div>
+    <div id="whoami" class="muted"></div>
+  </section>
+
+  <section class="card">
+    <h2>Settings</h2>
+    <div class="row">
+      <label>Provider
+        <select id="provider">
+          <option value="">— choose —</option>
+          <option value="google">Google</option>
+          <option value="microsoft">Microsoft</option>
+        </select>
+      </label>
+      <label>Timezone
+        <select id="timezone"></select>
+      </label>
+    </div>
+
+    <div class="row provider google-only">
+      <label>Google Endpoint (Apps Script URL)
+        <input id="googleEndpoint" placeholder="https://script.google.com/macros/s/.../exec" />
+      </label>
+    </div>
+
+    <div class="row provider ms-only">
+      <label>OneDrive Workbook Drive Item ID
+        <input id="msDriveItemId" placeholder="abc123..." />
+      </label>
+      <label>Excel Table Name
+        <input id="msTableName" value="FlightLogTable" />
+      </label>
+    </div>
+
+    <div class="row">
+      <button id="saveSettings">Save settings</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>New flight (Start)</h2>
+    <div class="row">
+      <label>Flight Name <input id="flightName" /></label>
+      <label>Project / Job <input id="project" /></label>
+    </div>
+    <div class="row">
+      <label>Start Time (Local)<input id="startLocal" type="datetime-local" /></label>
+      <button id="btnNow">Now</button>
+    </div>
+    <div class="row">
+      <label>Takeoff Lat <input id="lat" inputmode="decimal" /></label>
+      <label>Takeoff Lon <input id="lon" inputmode="decimal" /></label>
+      <button id="btnGPS">Use GPS</button>
+    </div>
+    <div class="row">
+      <button id="queueStart">Queue Start</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>End flight</h2>
+    <div class="row">
+      <label>Flight Name <input id="flightNameEnd" /></label>
+      <label>End Time (Local)<input id="endLocal" type="datetime-local" /></label>
+      <button id="btnEndNow">Now</button>
+    </div>
+    <div class="row">
+      <button id="queueEnd">Queue End</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Sync</h2>
+    <div class="row">
+      <button id="sync">Sync queued items</button>
+      <span id="queueCount" class="muted">0 queued</span>
+    </div>
+    <pre id="log" class="log"></pre>
+  </section>
+
+  <footer class="muted center">© Drone LogBook • PWA starter</footer>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- MSAL (Microsoft auth) -->
+  <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+  <script src="timezones.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+  </script>
+</body>
+</html>
