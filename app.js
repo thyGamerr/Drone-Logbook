@@ -1,203 +1,356 @@
-/* Drone LogBook PWA core */
+// app.js
+// Drone LogBook — main app logic
+// - Google sign-in via GIS (no CORS issues)
+// - Settings stored in localStorage
+// - Offline queue for start/end records
+// - Sync to Google Apps Script Web App endpoint (POST JSON)
+// - Microsoft hooks (placeholder)
 
-const $ = s => document.querySelector(s);
-const logEl = $('#log');
-const SETTINGS_KEY = 'dlb_settings_v1';
-const QUEUE_KEY = 'dlb_queue_v1';
-
-function log(line){ logEl.textContent = `${new Date().toLocaleTimeString()}  ${line}\n` + logEl.textContent; }
-function load(){ try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'); } catch { return {}; } }
-function save(v){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(v)); }
-function getQueue(){ try { return JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); } catch { return []; } }
-function setQueue(arr){ localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); updateQueueCount(); }
-function pushQueue(item){ const q=getQueue(); q.push(item); setQueue(q); }
-
-function updateQueueCount(){ $('#queueCount').textContent = `${getQueue().length} queued`; }
-
-function fillTimezones(){
-  const tzSel = $('#timezone');
-  TIMEZONES.forEach(tz=>{
-    const opt = document.createElement('option'); opt.value=tz; opt.textContent=tz; tzSel.appendChild(opt);
-  });
-}
-
-function uiFromSettings(){
-  const s = load();
-  $('#provider').value = s.provider || '';
-  $('#googleEndpoint').value = s.googleEndpoint || '';
-  $('#msDriveItemId').value = s.msDriveItemId || '';
-  $('#msTableName').value = s.msTableName || 'FlightLogTable';
-  $('#timezone').value = s.timezone || (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
-  toggleProviderSections();
-  updateQueueCount();
-  $('#whoami').textContent = s.userEmail ? `Signed in as ${s.userEmail}` : 'Not signed in';
-}
-
-function toggleProviderSections(){
-  const provider = $('#provider').value;
-  document.querySelectorAll('.provider').forEach(el=>el.style.display='none');
-  if(provider==='google') document.querySelectorAll('.google-only').forEach(el=>el.style.display='flex');
-  if(provider==='microsoft') document.querySelectorAll('.ms-only').forEach(el=>el.style.display='flex');
-}
-
-function saveSettings(){
-  const s = load();
-  s.provider = $('#provider').value || s.provider || '';
-  s.googleEndpoint = $('#googleEndpoint').value.trim();
-  s.msDriveItemId = $('#msDriveItemId').value.trim();
-  s.msTableName = $('#msTableName').value.trim() || 'FlightLogTable';
-  s.timezone = $('#timezone').value;
-  save(s); log('Settings saved'); uiFromSettings();
-}
-
-function nowLocalInput(){
-  const dt = new Date();
-  const pad = n=>String(n).padStart(2,'0');
-  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-}
-
-// --- GPS ---
-$('#btnGPS').addEventListener('click', ()=>{
-  if (!navigator.geolocation) return alert('Geolocation not available');
-  navigator.geolocation.getCurrentPosition(
-    pos => { $('#lat').value = pos.coords.latitude.toFixed(6); $('#lon').value = pos.coords.longitude.toFixed(6); },
-    err => alert('GPS error: ' + err.message), { enableHighAccuracy:true, timeout:10000 }
-  );
-});
-
-// --- Time helpers ---
-$('#btnNow').addEventListener('click', ()=> $('#startLocal').value = nowLocalInput());
-$('#btnEndNow').addEventListener('click', ()=> $('#endLocal').value = nowLocalInput());
-
-// --- Queue start/end ---
-$('#queueStart').addEventListener('click', ()=>{
-  const s = load();
-  const item = {
-    kind: 'start',
-    provider: s.provider,
-    Timezone: s.timezone,
-    'Flight Name': $('#flightName').value.trim(),
-    'Project / Job': $('#project').value.trim(),
-    'Start Time (Local)': $('#startLocal').value ? new Date($('#startLocal').value).toISOString() : new Date().toISOString(),
-    'Takeoff Lat': parseFloat($('#lat').value) || '',
-    'Takeoff Lon': parseFloat($('#lon').value) || ''
+(() => {
+  const CONFIG = window.APP_CONFIG || {
+    appName: "Drone LogBook",
+    version: "1.0.0",
+    defaultTimezone: "UTC",
+    redirectUri: location.origin + location.pathname,
+    storageKeyPrefix: "drone_logbook_",
   };
-  if(!item['Flight Name']) return alert('Enter Flight Name');
-  pushQueue(item); log('Queued START');
-});
 
-$('#queueEnd').addEventListener('click', ()=>{
-  const s = load();
-  const item = {
-    kind: 'end',
-    provider: s.provider,
-    Timezone: s.timezone,
-    'Flight Name': $('#flightNameEnd').value.trim(),
-    'End Time (Local)': $('#endLocal').value ? new Date($('#endLocal').value).toISOString() : new Date().toISOString()
+  const AUTH = window.AUTH_CONFIG || {
+    google: { clientId: "", scopes: "openid email profile" },
+    microsoft: { clientId: "", scopes: "openid email profile User.Read" },
   };
-  if(!item['Flight Name']) return alert('Enter Flight Name');
-  pushQueue(item); log('Queued END');
-});
 
-// --- Sync ---
-$('#sync').addEventListener('click', syncQueue);
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
 
-async function syncQueue(){
-  const q = getQueue();
-  if(!q.length) { log('Nothing to sync'); return; }
-  const s = load();
-  let sent=0, failed=0;
-  for (const item of q){
-    try{
-      if (item.provider === 'microsoft'){
-        await sendMicrosoft(item, s);
-      } else {
-        await sendGoogle(item, s);
+  const el = {
+    // auth
+    btnGoogle: $("btn-google"),
+    btnMicrosoft: $("btn-microsoft"),
+    signedInAs: $("signed-in-as"),
+
+    // settings
+    provider: $("provider"),
+    timezone: $("timezone"),
+    googleEndpoint: $("google-endpoint"),
+    msDriveItem: $("ms-driveitem"),
+    msTable: $("ms-table"),
+    providerGoogle: $("provider-google"),
+    providerMicrosoft: $("provider-microsoft"),
+    btnSaveSettings: $("btn-save-settings"),
+
+    // start
+    startFlightName: $("start-flight-name"),
+    startProject: $("start-project"),
+    startTime: $("start-time"),
+    btnNowStart: $("btn-now-start"),
+    startLat: $("start-lat"),
+    startLon: $("start-lon"),
+    btnGPSStart: $("btn-gps-start"),
+    btnQueueStart: $("btn-queue-start"),
+
+    // end
+    endFlightName: $("end-flight-name"),
+    endTime: $("end-time"),
+    btnNowEnd: $("btn-now-end"),
+    btnQueueEnd: $("btn-queue-end"),
+
+    // queue/sync
+    btnShowQueue: $("btn-show-queue"),
+    btnClearQueue: $("btn-clear-queue"),
+    btnSync: $("btn-sync"),
+    logConsole: $("log-console"),
+  };
+
+  // ---------- Storage helpers ----------
+  const k = (name) => `${CONFIG.storageKeyPrefix}${name}`;
+
+  const S = {
+    get(name, fallback = null) {
+      try {
+        const raw = localStorage.getItem(k(name));
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
       }
-      sent++;
-    }catch(e){
-      log('Sync error: ' + e); failed++; break;
+    },
+    set(name, value) {
+      localStorage.setItem(k(name), JSON.stringify(value));
+    },
+    remove(name) {
+      localStorage.removeItem(k(name));
+    },
+  };
+
+  // ---------- Logging ----------
+  function log(line = "") {
+    const ts = new Date().toLocaleTimeString();
+    el.logConsole.textContent += `[${ts}] ${line}\n`;
+    el.logConsole.scrollTop = el.logConsole.scrollHeight;
+  }
+  function toast(line) { log(line); }
+
+  // ---------- UI helpers ----------
+  function setHidden(elm, hidden) { elm.classList.toggle("hidden", hidden); }
+  function updateSignedInUI(text) { el.signedInAs.textContent = text || "Not signed in"; }
+
+  // ---------- Timezone ----------
+  function populateTimezones() {
+    const zones =
+      (window.TIMEZONES && Array.isArray(window.TIMEZONES) && window.TIMEZONES) ||
+      ["UTC","America/Vancouver","America/Los_Angeles","America/New_York","Europe/London","Europe/Paris","Asia/Tokyo","Australia/Sydney"];
+    el.timezone.innerHTML = "";
+    zones.forEach((z) => {
+      const opt = document.createElement("option");
+      opt.value = z; opt.textContent = z; el.timezone.appendChild(opt);
+    });
+    const saved = S.get("timezone");
+    el.timezone.value = saved || CONFIG.defaultTimezone || "UTC";
+  }
+
+  function localNowForInput() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  }
+
+  // ---------- Settings ----------
+  function loadSettings() {
+    const provider = S.get("provider", "");
+    el.provider.value = provider || "";
+
+    const tz = S.get("timezone", CONFIG.defaultTimezone);
+    el.timezone.value = tz;
+
+    el.googleEndpoint.value = S.get("google_endpoint", "") || "";
+    el.msDriveItem.value = S.get("ms_driveitem", "") || "";
+    el.msTable.value = S.get("ms_table", "FlightLogTable") || "FlightLogTable";
+
+    setHidden(el.providerGoogle, provider !== "google");
+    setHidden(el.providerMicrosoft, provider !== "microsoft");
+  }
+
+  function saveSettings() {
+    const provider = el.provider.value.trim();
+    const tz = el.timezone.value.trim();
+
+    S.set("provider", provider || "");
+    S.set("timezone", tz || CONFIG.defaultTimezone);
+
+    if (provider === "google") {
+      S.set("google_endpoint", el.googleEndpoint.value.trim());
+    } else if (provider === "microsoft") {
+      S.set("ms_driveitem", el.msDriveItem.value.trim());
+      S.set("ms_table", el.msTable.value.trim() || "FlightLogTable");
+    }
+    toast("Settings saved.");
+    setHidden(el.providerGoogle, provider !== "google");
+    setHidden(el.providerMicrosoft, provider !== "microsoft");
+  }
+
+  // ---------- Queue ----------
+  function getQueue() { return S.get("queue", []); }
+  function setQueue(arr) { S.set("queue", arr); }
+  function addToQueue(item) {
+    const q = getQueue(); q.push(item); setQueue(q);
+    toast(`Queued: ${item.type} — ${item.flightName}`);
+  }
+  function clearQueue() { setQueue([]); toast("Queue cleared."); }
+  function showQueue() {
+    const q = getQueue(); if (!q.length) return toast("Queue is empty.");
+    toast(`Queue (${q.length} item(s)):\n` + JSON.stringify(q, null, 2));
+  }
+
+  // ---------- GPS ----------
+  function getGPSForStart() {
+    if (!navigator.geolocation) return alert("Geolocation not supported in this browser.");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        el.startLat.value = latitude.toFixed(6);
+        el.startLon.value = longitude.toFixed(6);
+        toast(`GPS acquired: ${el.startLat.value}, ${el.startLon.value}`);
+      },
+      (err) => alert("Failed to get GPS: " + err.message),
+      { enableHighAccuracy: true, timeout: 10_000 }
+    );
+  }
+
+  // ---------- Google Sign-in (GIS) ----------
+  function signInWithGoogle() {
+    try {
+      if (!window.google || !google.accounts || !google.accounts.oauth2) {
+        alert("Google Identity Services SDK didn't load (check network or ad-blockers)."); return;
+      }
+      if (!AUTH.google.clientId) { alert("Missing Google Client ID in config.js"); return; }
+
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: AUTH.google.clientId,
+        scope: AUTH.google.scopes || "openid email profile",
+        callback: (response) => {
+          if (!response || !response.access_token) {
+            console.error("Google sign-in: no access token", response);
+            alert("Google sign-in failed (no token)."); return;
+          }
+          fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${response.access_token}` },
+          })
+            .then((r) => r.json())
+            .then((profile) => {
+              const email = profile.email || "";
+              S.set("provider", "google");
+              S.set("user_email", email);
+              S.set("google_access_token", response.access_token);
+              updateSignedInUI(`Signed in as ${email}`);
+              el.provider.value = "google";
+              setHidden(el.providerGoogle, false);
+              setHidden(el.providerMicrosoft, true);
+              toast("Google sign-in OK.");
+            })
+            .catch((e) => {
+              console.error("Fetch profile failed", e);
+              alert("Signed in, but failed to fetch Google profile.");
+            });
+        },
+      });
+
+      tokenClient.requestAccessToken({ prompt: "consent" });
+    } catch (e) {
+      console.error(e); alert("Google sign-in error (see console).");
     }
   }
-  if (failed===0){ setQueue([]); }
-  log(`Sync complete. Sent=${sent}, failed=${failed}`);
-}
 
-// --- Google path (Apps Script) ---
-async function sendGoogle(item, s){
-  if(!s.googleEndpoint) throw 'Missing Google endpoint';
-  const payload = { ...item };
-  // Attach email if known (from auth)
-  if (s.userEmail) payload['User Email'] = s.userEmail;
-  const r = await fetch(s.googleEndpoint, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  });
-  if(!r.ok) throw `Apps Script HTTP ${r.status}`;
-}
+  // ---------- Microsoft Sign-in (placeholder) ----------
+  function signInWithMicrosoft() {
+    S.set("provider", "microsoft");
+    updateSignedInUI("Microsoft: sign-in pending setup");
+    el.provider.value = "microsoft";
+    setHidden(el.providerGoogle, true);
+    setHidden(el.providerMicrosoft, false);
+    toast("Microsoft sign-in not yet configured.");
+  }
 
-// --- Microsoft path (Graph) ---
-async function sendMicrosoft(item, s){
-  if(!s.msDriveItemId) throw 'Missing OneDrive driveItemId';
-  if(!s.msTableName) throw 'Missing table name';
-  if(!s.msAccessToken) throw 'Not signed in to Microsoft';
+  // ---------- Create queue items ----------
+  function queueStart() {
+    const rec = {
+      type: "start",
+      timestamp: new Date().toISOString(),
+      userEmail: S.get("user_email", ""),
+      timezone: el.timezone.value || S.get("timezone") || CONFIG.defaultTimezone,
+      flightName: el.startFlightName.value.trim(),
+      project: el.startProject.value.trim(),
+      startLocal: el.startTime.value,
+      takeoffLat: el.startLat.value.trim(),
+      takeoffLon: el.startLon.value.trim(),
+    };
+    if (!rec.flightName) return alert("Please enter a Flight Name.");
+    if (!rec.startLocal) return alert("Please set Start Time.");
+    addToQueue(rec);
+  }
 
-  // Map to row array following your sheet header order (minimal)
-  const headers = [
-    'Timestamp','Date','User Email','Flight Name','Pilot Name','Observer / VO','Project / Job',
-    'Takeoff Lat','Takeoff Lon','Start Time (Local)','Start Wind (m/s)','Start Wind Dir (°)',
-    'End Time (Local)','RTK Mode','Base Method','Drone Model','Aircraft ID / S/N','Payload',
-    'Mission Type','Altitude AGL (m)','Speed (m/s)','Photos (#)','Max Height (m)',
-    'Incidents / Anomalies','Notes','Storage Path'
-  ];
-  const nowISO = new Date().toISOString();
-  const row = headers.map(h => item[h] ?? (h==='Timestamp'? nowISO : h==='User Email'? (load().userEmail||''): ''));
+  function queueEnd() {
+    const rec = {
+      type: "end",
+      timestamp: new Date().toISOString(),
+      userEmail: S.get("user_email", ""),
+      timezone: el.timezone.value || S.get("timezone") || CONFIG.defaultTimezone,
+      flightName: el.endFlightName.value.trim(),
+      endLocal: el.endTime.value,
+    };
+    if (!rec.flightName) return alert("Please enter the Flight Name to end.");
+    if (!rec.endLocal) return alert("Please set End Time.");
+    addToQueue(rec);
+  }
 
-  const url = `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(s.msDriveItemId)}/workbook/tables('${encodeURIComponent(s.msTableName)}')/rows/add`;
-  const res = await fetch(url, {
-    method:'POST',
-    headers:{ 'Authorization':`Bearer ${s.msAccessToken}`, 'Content-Type':'application/json' },
-    body: JSON.stringify({ values:[row] })
-  });
-  if(!res.ok) throw `Graph add row failed ${res.status}`;
-}
+  // ---------- Sync ----------
+  async function syncQueue() {
+    const provider = S.get("provider", el.provider.value || "");
+    const queue = getQueue();
+    if (!queue.length) return toast("Nothing to sync — queue is empty.");
 
-// --- Auth: Google ---
-$('#btnGoogle').addEventListener('click', ()=>{
-  google.accounts.id.initialize({
-    client_id: CONFIG.GOOGLE_CLIENT_ID,
-    callback: ({credential})=>{
-      // decode minimal payload to show email (optional)
-      try{
-        const payload = JSON.parse(atob(credential.split('.')[1]));
-        const s = load(); s.provider='google'; s.userEmail = payload.email || s.userEmail; save(s);
-        $('#whoami').textContent = `Signed in as ${s.userEmail || 'Google user'}`;
-        $('#provider').value='google'; toggleProviderSections();
-        log('Google sign-in OK');
-      }catch(e){ log('Google sign-in error: ' + e); }
+    if (provider === "google") {
+      const endpoint = el.googleEndpoint.value.trim() || S.get("google_endpoint", "");
+      if (!endpoint) return alert("Enter Google Endpoint (Apps Script Web App URL) in Settings.");
+      let success = 0;
+      for (const item of queue) {
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          success++;
+          toast(`Synced → Google: ${item.type} / ${item.flightName}`);
+        } catch (e) {
+          console.error("Google sync failed", e);
+          toast(`Failed → Google: ${item.type} / ${item.flightName} — ${e.message}`);
+        }
+      }
+      if (success === queue.length) { clearQueue(); toast("All items synced to Google."); }
+      else { toast("Some items failed. They remain in the queue."); }
+      return;
     }
-  });
-  google.accounts.id.prompt(); // popup
-});
 
-// --- Auth: Microsoft ---
-$('#btnMicrosoft').addEventListener('click', async ()=>{
-  const msalConfig = { auth: { clientId: CONFIG.MS_CLIENT_ID, redirectUri: location.origin } };
-  const msalInstance = new msal.PublicClientApplication(msalConfig);
-  const scopes = ['Files.ReadWrite','User.Read','offline_access'];
-  const resp = await msalInstance.loginPopup({ scopes });
-  const tokenResp = await msalInstance.acquireTokenSilent({ scopes, account: resp.account });
-  const s = load(); s.provider='microsoft'; s.msAccessToken = tokenResp.accessToken; s.userEmail = resp.account.username; save(s);
-  $('#whoami').textContent = `Signed in as ${s.userEmail}`;
-  $('#provider').value='microsoft'; toggleProviderSections();
-  log('Microsoft sign-in OK');
-});
+    if (provider === "microsoft") {
+      alert("Microsoft sync not yet implemented.");
+      return;
+    }
 
-// --- Settings UI wiring ---
-$('#provider').addEventListener('change', toggleProviderSections);
-$('#saveSettings').addEventListener('click', saveSettings);
+    alert("Choose a provider in Settings (Google or Microsoft).");
+  }
 
-// init
-fillTimezones();
-uiFromSettings();
+  // ---------- Event bindings (safe) ----------
+  function bindEvents() {
+    const on = (elem, evt, fn) => { if (elem) elem.addEventListener(evt, fn); };
+
+    // sign-in
+    on(el.btnGoogle, "click", signInWithGoogle);
+    on(el.btnMicrosoft, "click", signInWithMicrosoft);
+
+    // settings
+    on(el.btnSaveSettings, "click", saveSettings);
+    on(el.provider, "change", (e) => {
+      const v = e.target.value;
+      setHidden(el.providerGoogle, v !== "google");
+      setHidden(el.providerMicrosoft, v !== "microsoft");
+    });
+
+    // start
+    on(el.btnNowStart, "click", () => (el.startTime.value = localNowForInput()));
+    on(el.btnGPSStart, "click", getGPSForStart);
+    on(el.btnQueueStart, "click", queueStart);
+
+    // end
+    on(el.btnNowEnd, "click", () => (el.endTime.value = localNowForInput()));
+    on(el.btnQueueEnd, "click", queueEnd);
+
+    // queue/sync
+    on(el.btnShowQueue, "click", showQueue);
+    on(el.btnClearQueue, "click", clearQueue);
+    on(el.btnSync, "click", syncQueue);
+  }
+
+  // ---------- Init ----------
+  function init() {
+    populateTimezones();
+    loadSettings();
+
+    const email = S.get("user_email", "");
+    updateSignedInUI(email ? `Signed in as ${email}` : "Not signed in");
+
+    el.startTime.value = localNowForInput();
+    el.endTime.value = "";
+
+    bindEvents();
+    log(`${CONFIG.appName} v${CONFIG.version} ready.`);
+    if (!navigator.onLine) log("You are offline. Queue entries and sync when back online.");
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+})();
