@@ -1,5 +1,5 @@
-// Short, practical IANA list
-const TIMEZONES = [
+// timezones.js — simple IANA timezone list for the dropdown
+window.TIMEZONES = [
   "UTC",
   "America/Vancouver","America/Los_Angeles","America/Denver","America/Chicago",
   "America/Toronto","America/New_York","America/Phoenix","America/Anchorage",
