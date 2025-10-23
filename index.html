@@ -1,403 +1,191 @@
-// app.js
-// Drone LogBook — main app logic
-// - Google sign-in via GIS (no CORS issues)
-// - Settings stored in localStorage
-// - Offline queue for start/end records
-// - Sync to Google Apps Script Web App endpoint (POST JSON)
-// - Microsoft hooks (placeholder)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-(() => {
-  const CONFIG = window.APP_CONFIG || {
-    appName: "Drone LogBook",
-    version: "1.0.0",
-    defaultTimezone: "UTC",
-    redirectUri: location.origin + location.pathname,
-    storageKeyPrefix: "drone_logbook_",
-  };
+  <title>Drone LogBook</title>
+  <meta name="description" content="Offline-first drone flight logbook. Works with Google or Microsoft and syncs to your storage when online." />
 
-  const AUTH = window.AUTH_CONFIG || {
-    google: { clientId: "", scopes: "openid email profile" },
-    microsoft: { clientId: "", scopes: "openid email profile User.Read" },
-  };
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0D1117" />
+  <!-- Emoji favicon to avoid 404 -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚁</text></svg>">
 
-  // ---------- DOM ----------
-  const $ = (id) => document.getElementById(id);
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css" />
 
-  const el = {
-    // auth
-    btnGoogle: $("btn-google"),
-    btnMicrosoft: $("btn-microsoft"),
-    signedInAs: $("signed-in-as"),
+  <!-- Google Identity Services SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <noscript>
+    <div style="padding:1rem;background:#ffefef;color:#900;border:1px solid #900;">
+      JavaScript is required to use Drone LogBook.
+    </div>
+  </noscript>
 
-    // settings
-    provider: $("provider"),
-    timezone: $("timezone"),
-    googleEndpoint: $("google-endpoint"),
-    msDriveItem: $("ms-driveitem"),
-    msTable: $("ms-table"),
-    providerGoogle: $("provider-google"),
-    providerMicrosoft: $("provider-microsoft"),
-    btnSaveSettings: $("btn-save-settings"),
+  <header class="container">
+    <h1>Drone LogBook</h1>
+    <p class="muted">Offline-first logbook. Choose Google or Microsoft.</p>
+  </header>
 
-    // start
-    startFlightName: $("start-flight-name"),
-    startProject: $("start-project"),
-    startTime: $("start-time"),
-    btnNowStart: $("btn-now-start"),
-    startLat: $("start-lat"),
-    startLon: $("start-lon"),
-    btnGPSStart: $("btn-gps-start"),
-    btnQueueStart: $("btn-queue-start"),
+  <!-- Sign-in -->
+  <section class="container card" id="auth-section">
+    <h2>Sign in</h2>
+    <div class="row gap">
+      <button id="btn-google" class="btn btn-primary">Sign in with Google</button>
+      <button id="btn-microsoft" class="btn">Sign in with Microsoft</button>
+    </div>
+    <p id="signed-in-as" class="muted">Not signed in</p>
+  </section>
 
-    // end
-    endFlightName: $("end-flight-name"),
-    endTime: $("end-time"),
-    btnNowEnd: $("btn-now-end"),
-    btnQueueEnd: $("btn-queue-end"),
+  <!-- Settings -->
+  <section class="container card" id="settings-section">
+    <h2>Settings</h2>
+    <div class="grid-2">
+      <div>
+        <label for="provider">Provider</label>
+        <select id="provider">
+          <option value="">— choose —</option>
+          <option value="google">Google</option>
+          <option value="microsoft">Microsoft</option>
+        </select>
+      </div>
+      <div>
+        <label for="timezone">Timezone</label>
+        <select id="timezone"></select>
+      </div>
+    </div>
 
-    // queue/sync
-    btnShowQueue: $("btn-show-queue"),
-    btnClearQueue: $("btn-clear-queue"),
-    btnSync: $("btn-sync"),
-    logConsole: $("log-console"),
-  };
+    <!-- Provider-specific fields -->
+    <div id="provider-google" class="mt hidden">
+      <label for="google-endpoint">Google Endpoint (Apps Script Web App URL)</label>
+      <input id="google-endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+    </div>
 
-  // ---------- Storage helpers ----------
-  const k = (name) => `${CONFIG.storageKeyPrefix}${name}`;
+    <div id="provider-microsoft" class="mt hidden">
+      <div class="grid-2">
+        <div>
+          <label for="ms-driveitem">OneDrive File (driveItemId)</label>
+          <input id="ms-driveitem" type="text" placeholder="01ABCDEF...!" />
+        </div>
+        <div>
+          <label for="ms-table">Excel Table Name</label>
+          <input id="ms-table" type="text" value="FlightLogTable" />
+        </div>
+      </div>
+    </div>
 
-  const S = {
-    get(name, fallback = null) {
-      try {
-        const raw = localStorage.getItem(k(name));
-        return raw ? JSON.parse(raw) : fallback;
-      } catch {
-        return fallback;
-      }
-    },
-    set(name, value) {
-      localStorage.setItem(k(name), JSON.stringify(value));
-    },
-    remove(name) {
-      localStorage.removeItem(k(name));
-    },
-  };
+    <div class="row mt">
+      <button id="btn-save-settings" class="btn btn-primary">Save settings</button>
+    </div>
+  </section>
 
-  // ---------- Logging ----------
-  function log(line = "") {
-    const ts = new Date().toLocaleTimeString();
-    el.logConsole.textContent += `[${ts}] ${line}\n`;
-    el.logConsole.scrollTop = el.logConsole.scrollHeight;
-  }
+  <!-- New flight (Start) -->
+  <section class="container card" id="start-section">
+    <h2>New flight (Start)</h2>
 
-  function toast(line) {
-    log(line);
-  }
+    <div class="grid-2">
+      <div>
+        <label for="start-flight-name">Flight Name</label>
+        <input id="start-flight-name" type="text" placeholder="e.g. River Survey A" />
+      </div>
+      <div>
+        <label for="start-project">Project / Job</label>
+        <input id="start-project" type="text" />
+      </div>
+    </div>
 
-  // ---------- UI helpers ----------
-  function setHidden(elm, hidden) {
-    elm.classList.toggle("hidden", hidden);
-  }
+    <div class="grid-2">
+      <div>
+        <label for="start-time">Start Time (Local)</label>
+        <div class="input-row">
+          <input id="start-time" type="datetime-local" />
+          <button id="btn-now-start" class="btn btn-ghost">Now</button>
+        </div>
+      </div>
+      <div></div>
+    </div>
 
-  function updateSignedInUI(text) {
-    el.signedInAs.textContent = text || "Not signed in";
-  }
+    <div class="grid-2">
+      <div>
+        <label for="start-lat">Takeoff Lat</label>
+        <input id="start-lat" type="text" inputmode="decimal" />
+      </div>
+      <div>
+        <label for="start-lon">Takeoff Lon</label>
+        <div class="input-row">
+          <input id="start-lon" type="text" inputmode="decimal" />
+          <button id="btn-gps-start" class="btn btn-ghost">Use GPS</button>
+        </div>
+      </div>
+    </div>
 
-  // ---------- Timezone ----------
-  function populateTimezones() {
-    // timezones.js can expose window.TIMEZONES; fall back to Intl guesses
-    const zones =
-      (window.TIMEZONES && Array.isArray(window.TIMEZONES) && window.TIMEZONES) ||
-      ["UTC", "America/Vancouver", "America/Los_Angeles", "America/New_York", "Europe/London", "Europe/Paris", "Asia/Tokyo", "Australia/Sydney"];
+    <div class="row mt">
+      <button id="btn-queue-start" class="btn btn-primary">Queue Start</button>
+    </div>
+  </section>
 
-    el.timezone.innerHTML = "";
-    zones.forEach((z) => {
-      const opt = document.createElement("option");
-      opt.value = z;
-      opt.textContent = z;
-      el.timezone.appendChild(opt);
-    });
+  <!-- End flight -->
+  <section class="container card" id="end-section">
+    <h2>End flight</h2>
 
-    const saved = S.get("timezone");
-    el.timezone.value = saved || CONFIG.defaultTimezone || "UTC";
-  }
+    <div class="grid-2">
+      <div>
+        <label for="end-flight-name">Flight Name</label>
+        <input id="end-flight-name" type="text" placeholder="Match start flight name" />
+      </div>
+      <div>
+        <label for="end-time">End Time (Local)</label>
+        <div class="input-row">
+          <input id="end-time" type="datetime-local" />
+          <button id="btn-now-end" class="btn btn-ghost">Now</button>
+        </div>
+      </div>
+    </div>
 
-  function localNowForInput() {
-    // yyyy-MM-ddTHH:mm (no seconds) for <input type=datetime-local>
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    const mm = pad(d.getMonth() + 1);
-    const dd = pad(d.getDate());
-    const hh = pad(d.getHours());
-    const mi = pad(d.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-  }
+    <div class="row mt">
+      <button id="btn-queue-end" class="btn">Queue End</button>
+    </div>
+  </section>
 
-  // ---------- Settings ----------
-  function loadSettings() {
-    const provider = S.get("provider", "");
-    el.provider.value = provider || "";
+  <!-- Sync / Queue -->
+  <section class="container card" id="sync-section">
+    <h2>Sync</h2>
+    <p class="muted">Queued records are saved offline. They’ll upload when you press Sync and you’re online.</p>
+    <div class="row gap">
+      <button id="btn-show-queue" class="btn">View Queue</button>
+      <button id="btn-clear-queue" class="btn btn-danger">Clear Queue</button>
+      <button id="btn-sync" class="btn btn-primary">Sync</button>
+    </div>
+    <pre id="log-console" class="log mt" aria-live="polite"></pre>
+  </section>
 
-    const tz = S.get("timezone", CONFIG.defaultTimezone);
-    el.timezone.value = tz;
+  <footer class="container muted" style="margin-bottom:5rem">
+    <small>© 2025 Drone LogBook</small>
+  </footer>
 
-    el.googleEndpoint.value = S.get("google_endpoint", "") || "";
-    el.msDriveItem.value = S.get("ms_driveitem", "") || "";
-    el.msTable.value = S.get("ms_table", "FlightLogTable") || "FlightLogTable";
+  <!-- App scripts -->
+  <!-- timezones list first -->
+  <script type="module" src="timezones.js"></script>
 
-    setHidden(el.providerGoogle, provider !== "google");
-    setHidden(el.providerMicrosoft, provider !== "microsoft");
-  }
+  <!-- config and app -->
+  <script type="module">
+    import { APP_CONFIG, AUTH_CONFIG } from './config.js';
+    // expose config for app.js
+    window.APP_CONFIG = APP_CONFIG;
+    window.AUTH_CONFIG = AUTH_CONFIG;
+    // load app logic after config is set
+    import './app.js';
 
-  function saveSettings() {
-    const provider = el.provider.value.trim();
-    const tz = el.timezone.value.trim();
-
-    S.set("provider", provider || "");
-    S.set("timezone", tz || CONFIG.defaultTimezone);
-
-    if (provider === "google") {
-      S.set("google_endpoint", el.googleEndpoint.value.trim());
-    } else if (provider === "microsoft") {
-      S.set("ms_driveitem", el.msDriveItem.value.trim());
-      S.set("ms_table", el.msTable.value.trim() || "FlightLogTable");
-    }
-    toast("Settings saved.");
-    setHidden(el.providerGoogle, provider !== "google");
-    setHidden(el.providerMicrosoft, provider !== "microsoft");
-  }
-
-  // ---------- Queue ----------
-  function getQueue() {
-    return S.get("queue", []);
-  }
-
-  function setQueue(arr) {
-    S.set("queue", arr);
-  }
-
-  function addToQueue(item) {
-    const q = getQueue();
-    q.push(item);
-    setQueue(q);
-    toast(`Queued: ${item.type} — ${item.flightName}`);
-  }
-
-  function clearQueue() {
-    setQueue([]);
-    toast("Queue cleared.");
-  }
-
-  function showQueue() {
-    const q = getQueue();
-    if (!q.length) return toast("Queue is empty.");
-    toast(`Queue (${q.length} item(s)):\n` + JSON.stringify(q, null, 2));
-  }
-
-  // ---------- GPS ----------
-  function getGPSForStart() {
-    if (!navigator.geolocation) {
-      return alert("Geolocation not supported in this browser.");
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        el.startLat.value = latitude.toFixed(6);
-        el.startLon.value = longitude.toFixed(6);
-        toast(`GPS acquired: ${el.startLat.value}, ${el.startLon.value}`);
-      },
-      (err) => {
-        alert("Failed to get GPS: " + err.message);
-      },
-      { enableHighAccuracy: true, timeout: 10_000 }
-    );
-  }
-
-  // ---------- Google Sign-in (GIS) ----------
-  function signInWithGoogle() {
-    try {
-      if (!window.google || !google.accounts || !google.accounts.oauth2) {
-        alert("Google Identity Services SDK didn't load (check network or ad-blockers).");
-        return;
-      }
-      if (!AUTH.google.clientId) {
-        alert("Missing Google Client ID in config.js");
-        return;
-      }
-
-      const tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: AUTH.google.clientId,
-        scope: AUTH.google.scopes || "openid email profile",
-        callback: (response) => {
-          if (!response || !response.access_token) {
-            console.error("Google sign-in: no access token", response);
-            alert("Google sign-in failed (no token).");
-            return;
-          }
-          // Get basic profile
-          fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-            headers: { Authorization: `Bearer ${response.access_token}` },
-          })
-            .then((r) => r.json())
-            .then((profile) => {
-              const email = profile.email || "";
-              S.set("provider", "google");
-              S.set("user_email", email);
-              S.set("google_access_token", response.access_token);
-              updateSignedInUI(`Signed in as ${email}`);
-              el.provider.value = "google";
-              setHidden(el.providerGoogle, false);
-              setHidden(el.providerMicrosoft, true);
-              toast("Google sign-in OK.");
-            })
-            .catch((e) => {
-              console.error("Fetch profile failed", e);
-              alert("Signed in, but failed to fetch Google profile.");
-            });
-        },
+    // PWA service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
       });
-
-      tokenClient.requestAccessToken({ prompt: "consent" });
-    } catch (e) {
-      console.error(e);
-      alert("Google sign-in error (see console).");
     }
-  }
-
-  // ---------- Microsoft Sign-in (placeholder) ----------
-  function signInWithMicrosoft() {
-    // You can wire MSAL here later. For now we just mark as selected.
-    S.set("provider", "microsoft");
-    updateSignedInUI("Microsoft: sign-in pending setup");
-    el.provider.value = "microsoft";
-    setHidden(el.providerGoogle, true);
-    setHidden(el.providerMicrosoft, false);
-    toast("Microsoft sign-in not yet configured.");
-  }
-
-  // ---------- Create queue items ----------
-  function queueStart() {
-    const rec = {
-      type: "start",
-      timestamp: new Date().toISOString(),
-      userEmail: S.get("user_email", ""),
-      timezone: el.timezone.value || S.get("timezone") || CONFIG.defaultTimezone,
-      flightName: el.startFlightName.value.trim(),
-      project: el.startProject.value.trim(),
-      startLocal: el.startTime.value, // local string
-      takeoffLat: el.startLat.value.trim(),
-      takeoffLon: el.startLon.value.trim(),
-    };
-    if (!rec.flightName) return alert("Please enter a Flight Name.");
-    if (!rec.startLocal) return alert("Please set Start Time.");
-    addToQueue(rec);
-  }
-
-  function queueEnd() {
-    const rec = {
-      type: "end",
-      timestamp: new Date().toISOString(),
-      userEmail: S.get("user_email", ""),
-      timezone: el.timezone.value || S.get("timezone") || CONFIG.defaultTimezone,
-      flightName: el.endFlightName.value.trim(),
-      endLocal: el.endTime.value,
-    };
-    if (!rec.flightName) return alert("Please enter the Flight Name to end.");
-    if (!rec.endLocal) return alert("Please set End Time.");
-    addToQueue(rec);
-  }
-
-  // ---------- Sync ----------
-  async function syncQueue() {
-    const provider = S.get("provider", el.provider.value || "");
-    const queue = getQueue();
-    if (!queue.length) return toast("Nothing to sync — queue is empty.");
-
-    if (provider === "google") {
-      const endpoint = el.googleEndpoint.value.trim() || S.get("google_endpoint", "");
-      if (!endpoint) return alert("Enter Google Endpoint (Apps Script Web App URL) in Settings.");
-      let success = 0;
-      for (const item of queue) {
-        try {
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(item),
-          });
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-          }
-          success++;
-          toast(`Synced → Google: ${item.type} / ${item.flightName}`);
-        } catch (e) {
-          console.error("Google sync failed", e);
-          toast(`Failed → Google: ${item.type} / ${item.flightName} — ${e.message}`);
-        }
-      }
-      if (success === queue.length) {
-        clearQueue();
-        toast("All items synced to Google.");
-      } else {
-        toast("Some items failed. They remain in the queue.");
-      }
-      return;
-    }
-
-    if (provider === "microsoft") {
-      // Placeholder. Implement MS Graph add-row to Excel table using MSAL token.
-      alert("Microsoft sync not yet implemented.");
-      return;
-    }
-
-    alert("Choose a provider in Settings (Google or Microsoft).");
-  }
-
-  // ---------- Event bindings ----------
-  function bindEvents() {
-    // sign-in
-    el.btnGoogle?.addEventListener("click", signInWithGoogle);
-    el.btnMicrosoft?.addEventListener("click", signInWithMicrosoft);
-
-    // settings
-    el.btnSaveSettings?.addEventListener("click", saveSettings);
-    el.provider?.addEventListener("change", (e) => {
-      const v = e.target.value;
-      setHidden(el.providerGoogle, v !== "google");
-      setHidden(el.providerMicrosoft, v !== "microsoft");
-    });
-
-    // start
-    el.btnNowStart?.addEventListener("click", () => (el.startTime.value = localNowForInput()));
-    el.btnGPSStart?.addEventListener("click", getGPSForStart);
-    el.btnQueueStart?.addEventListener("click", queueStart);
-
-    // end
-    el.btnNowEnd?.addEventListener("click", () => (el.endTime.value = localNowForInput()));
-    el.btnQueueEnd?.addEventListener("click", queueEnd);
-
-    // queue/sync
-    el.btnShowQueue?.addEventListener("click", showQueue);
-    el.btnClearQueue?.addEventListener("click", clearQueue);
-    el.btnSync?.addEventListener("click", syncQueue);
-  }
-
-  // ---------- Init ----------
-  function init() {
-    populateTimezones();
-    loadSettings();
-
-    // If previously signed in (Google), reflect it
-    const email = S.get("user_email", "");
-    updateSignedInUI(email ? `Signed in as ${email}` : "Not signed in");
-
-    // Prefill start/end times
-    el.startTime.value = localNowForInput();
-    el.endTime.value = "";
-
-    bindEvents();
-    log(`${CONFIG.appName} v${CONFIG.version} ready.`);
-    if (!navigator.onLine) log("You are offline. Queue entries and sync when back online.");
-  }
-
-  document.addEventListener("DOMContentLoaded", init);
-})();
+  </script>
+</body>
+</html>
