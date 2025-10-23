@@ -1,116 +1,188 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <title>Drone LogBook</title>
+  <meta name="description" content="Offline-first drone flight logbook. Works with Google or Microsoft and syncs to your storage when online." />
+
+  <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0D1117" />
+  <link rel="icon" href="icon.png" />
+
+  <!-- Styles -->
   <link rel="stylesheet" href="styles.css" />
-  <meta name="theme-color" content="#0ea5e9" />
+
+  <!-- Google Identity Services SDK (for Google sign-in; avoids CORS issues) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-  <header>
+  <noscript>
+    <div style="padding:1rem;background:#ffefef;color:#900;border:1px solid #900;">
+      JavaScript is required to use Drone LogBook.
+    </div>
+  </noscript>
+
+  <header class="container">
     <h1>Drone LogBook</h1>
     <p class="muted">Offline-first logbook. Choose Google or Microsoft.</p>
   </header>
 
-  <section class="card">
+  <!-- Sign-in -->
+  <section class="container card" id="auth-section">
     <h2>Sign in</h2>
-    <div class="row">
-      <button id="btnGoogle">Sign in with Google</button>
-      <button id="btnMicrosoft">Sign in with Microsoft</button>
+    <div class="row gap">
+      <button id="btn-google" class="btn btn-primary">Sign in with Google</button>
+      <button id="btn-microsoft" class="btn">Sign in with Microsoft</button>
     </div>
-    <div id="whoami" class="muted"></div>
+    <p id="signed-in-as" class="muted">Not signed in</p>
   </section>
 
-  <section class="card">
+  <!-- Settings -->
+  <section class="container card" id="settings-section">
     <h2>Settings</h2>
-    <div class="row">
-      <label>Provider
+    <div class="grid-2">
+      <div>
+        <label for="provider">Provider</label>
         <select id="provider">
           <option value="">— choose —</option>
           <option value="google">Google</option>
           <option value="microsoft">Microsoft</option>
         </select>
-      </label>
-      <label>Timezone
+      </div>
+      <div>
+        <label for="timezone">Timezone</label>
         <select id="timezone"></select>
-      </label>
+      </div>
     </div>
 
-    <div class="row provider google-only">
-      <label>Google Endpoint (Apps Script URL)
-        <input id="googleEndpoint" placeholder="https://script.google.com/macros/s/.../exec" />
-      </label>
+    <!-- Provider-specific fields -->
+    <div id="provider-google" class="mt hidden">
+      <label for="google-endpoint">Google Endpoint (Apps Script Web App URL)</label>
+      <input id="google-endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
     </div>
 
-    <div class="row provider ms-only">
-      <label>OneDrive Workbook Drive Item ID
-        <input id="msDriveItemId" placeholder="abc123..." />
-      </label>
-      <label>Excel Table Name
-        <input id="msTableName" value="FlightLogTable" />
-      </label>
+    <div id="provider-microsoft" class="mt hidden">
+      <div class="grid-2">
+        <div>
+          <label for="ms-driveitem">OneDrive File (driveItemId)</label>
+          <input id="ms-driveitem" type="text" placeholder="01ABCDEF...!" />
+        </div>
+        <div>
+          <label for="ms-table">Excel Table Name</label>
+          <input id="ms-table" type="text" value="FlightLogTable" />
+        </div>
+      </div>
     </div>
 
-    <div class="row">
-      <button id="saveSettings">Save settings</button>
+    <div class="row mt">
+      <button id="btn-save-settings" class="btn btn-primary">Save settings</button>
     </div>
   </section>
 
-  <section class="card">
+  <!-- New flight (Start) -->
+  <section class="container card" id="start-section">
     <h2>New flight (Start)</h2>
-    <div class="row">
-      <label>Flight Name <input id="flightName" /></label>
-      <label>Project / Job <input id="project" /></label>
+
+    <div class="grid-2">
+      <div>
+        <label for="start-flight-name">Flight Name</label>
+        <input id="start-flight-name" type="text" placeholder="e.g. River Survey A" />
+      </div>
+      <div>
+        <label for="start-project">Project / Job</label>
+        <input id="start-project" type="text" />
+      </div>
     </div>
-    <div class="row">
-      <label>Start Time (Local)<input id="startLocal" type="datetime-local" /></label>
-      <button id="btnNow">Now</button>
+
+    <div class="grid-2">
+      <div>
+        <label for="start-time">Start Time (Local)</label>
+        <div class="input-row">
+          <input id="start-time" type="datetime-local" />
+          <button id="btn-now-start" class="btn btn-ghost">Now</button>
+        </div>
+      </div>
+      <div></div>
     </div>
-    <div class="row">
-      <label>Takeoff Lat <input id="lat" inputmode="decimal" /></label>
-      <label>Takeoff Lon <input id="lon" inputmode="decimal" /></label>
-      <button id="btnGPS">Use GPS</button>
+
+    <div class="grid-2">
+      <div>
+        <label for="start-lat">Takeoff Lat</label>
+        <input id="start-lat" type="text" inputmode="decimal" />
+      </div>
+      <div>
+        <label for="start-lon">Takeoff Lon</label>
+        <div class="input-row">
+          <input id="start-lon" type="text" inputmode="decimal" />
+          <button id="btn-gps-start" class="btn btn-ghost">Use GPS</button>
+        </div>
+      </div>
     </div>
-    <div class="row">
-      <button id="queueStart">Queue Start</button>
+
+    <div class="row mt">
+      <button id="btn-queue-start" class="btn btn-primary">Queue Start</button>
     </div>
   </section>
 
-  <section class="card">
+  <!-- End flight -->
+  <section class="container card" id="end-section">
     <h2>End flight</h2>
-    <div class="row">
-      <label>Flight Name <input id="flightNameEnd" /></label>
-      <label>End Time (Local)<input id="endLocal" type="datetime-local" /></label>
-      <button id="btnEndNow">Now</button>
+
+    <div class="grid-2">
+      <div>
+        <label for="end-flight-name">Flight Name</label>
+        <input id="end-flight-name" type="text" placeholder="Match start flight name" />
+      </div>
+      <div>
+        <label for="end-time">End Time (Local)</label>
+        <div class="input-row">
+          <input id="end-time" type="datetime-local" />
+          <button id="btn-now-end" class="btn btn-ghost">Now</button>
+        </div>
+      </div>
     </div>
-    <div class="row">
-      <button id="queueEnd">Queue End</button>
+
+    <div class="row mt">
+      <button id="btn-queue-end" class="btn">Queue End</button>
     </div>
   </section>
 
-  <section class="card">
+  <!-- Sync / Queue -->
+  <section class="container card" id="sync-section">
     <h2>Sync</h2>
-    <div class="row">
-      <button id="sync">Sync queued items</button>
-      <span id="queueCount" class="muted">0 queued</span>
+    <p class="muted">Queued records are saved offline. They’ll upload when you press Sync and you’re online.</p>
+    <div class="row gap">
+      <button id="btn-show-queue" class="btn">View Queue</button>
+      <button id="btn-clear-queue" class="btn btn-danger">Clear Queue</button>
+      <button id="btn-sync" class="btn btn-primary">Sync</button>
     </div>
-    <pre id="log" class="log"></pre>
+    <pre id="log-console" class="log mt" aria-live="polite"></pre>
   </section>
 
-  <footer class="muted center">© Drone LogBook • PWA starter</footer>
+  <footer class="container muted" style="margin-bottom:5rem">
+    <small>© 2025 Drone LogBook</small>
+  </footer>
 
-  <!-- Google Identity Services -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- MSAL (Microsoft auth) -->
-  <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
-  <script src="timezones.js"></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
-  <script>
+  <!-- App scripts -->
+  <!-- timezones list first -->
+  <script type="module" src="timezones.js"></script>
+  <!-- config and app -->
+  <script type="module">
+    import { APP_CONFIG, AUTH_CONFIG } from './config.js';
+    import './app.js'; // app.js attaches listeners by IDs
+
+    // Expose config for debugging (optional)
+    window.APP_CONFIG = APP_CONFIG;
+    window.AUTH_CONFIG = AUTH_CONFIG;
+
+    // Register service worker for offline use
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+      });
     }
   </script>
 </body>
