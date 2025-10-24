@@ -1,4 +1,5 @@
-// config.js — public config (safe for GitHub Pages)
+// config.js — Configuration for Drone LogBook
+
 export const APP_CONFIG = {
   appName: "Drone LogBook",
   version: "1.0.0",
@@ -9,13 +10,11 @@ export const APP_CONFIG = {
 
 export const AUTH_CONFIG = {
   google: {
-    // Replace with your real Google Client ID
-    clientId: "314985765441-64a7gf2b9vvvesv6tc8ocngn24pej827.apps.googleusercontent.com",
+    clientId: "314985765441-64a7gf2b9vvvesv6tc8ocgn24pej827.apps.googleusercontent.com", // your actual Google Client ID
     scopes: "openid email profile"
   },
   microsoft: {
-    // Fill later when Azure app is created
-    clientId: "YOUR_MICROSOFT_CLIENT_ID_HERE",
+    clientId: "",
     scopes: "openid email profile User.Read"
   }
 };
