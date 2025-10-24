@@ -4,97 +4,103 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Drone LogBook</title>
+
+  <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0a192f" />
+
+  <!-- Styles -->
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- Config -->
+  <script src="config.js"></script>
 </head>
 <body>
-  <h1>Drone LogBook</h1>
-  <p>Offline-first logbook. Choose Google or Microsoft.</p>
+  <header>
+    <h1>Drone LogBook</h1>
+    <p>Offline-first logbook. Choose Google or Microsoft.</p>
+  </header>
 
-  <section id="auth">
-    <button id="btn-google">Sign in with Google</button>
-    <button id="btn-microsoft">Sign in with Microsoft</button>
-    <p id="signed-in-as">Not signed in</p>
-  </section>
+  <main>
+    <!-- Sign-in -->
+    <section>
+      <h2>Sign in</h2>
+      <button id="btn-google">Sign in with Google</button>
+      <button id="btn-microsoft">Sign in with Microsoft</button>
+      <p id="signed-in-as">Not signed in</p>
+    </section>
 
-  <section id="settings">
-    <h2>Settings</h2>
-    <label>Provider:
+    <!-- Settings -->
+    <section>
+      <h2>Settings</h2>
+      <label>Provider</label>
       <select id="provider">
         <option value="">— choose —</option>
         <option value="google">Google</option>
         <option value="microsoft">Microsoft</option>
       </select>
-    </label>
 
-    <label>Timezone:
+      <label>Timezone</label>
       <select id="timezone"></select>
-    </label>
 
-    <div id="provider-google" class="hidden">
-      <label>Google Endpoint URL:
-        <input id="google-endpoint" type="text" placeholder="https://script.google.com/macros/s/..." />
-      </label>
-    </div>
+      <div id="provider-google" class="provider-section hidden">
+        <label>Google Endpoint (Apps Script URL)</label>
+        <input id="google-endpoint" placeholder="https://script.google.com/macros/s/..." />
+      </div>
 
-    <div id="provider-microsoft" class="hidden">
-      <label>Drive Item ID:
-        <input id="ms-driveitem" type="text" placeholder="Excel file ID" />
-      </label>
-      <label>Table Name:
-        <input id="ms-table" type="text" value="FlightLogTable" />
-      </label>
-    </div>
+      <div id="provider-microsoft" class="provider-section hidden">
+        <label>Drive Item ID</label>
+        <input id="ms-driveitem" />
+        <label>Table Name</label>
+        <input id="ms-table" value="FlightLogTable" />
+      </div>
 
-    <button id="btn-save-settings">Save settings</button>
-  </section>
+      <button id="btn-save-settings">Save settings</button>
+    </section>
 
-  <section id="start-flight">
-    <h2>New flight (Start)</h2>
-    <label>Flight Name: <input id="start-flight-name" type="text" /></label>
-    <label>Project / Job: <input id="start-project" type="text" /></label>
-    <label>Start Time (Local):
-      <input id="start-time" type="datetime-local" />
+    <!-- Start Flight -->
+    <section>
+      <h2>New flight (Start)</h2>
+      <label>Flight Name</label>
+      <input id="start-flight-name" />
+      <label>Project / Job</label>
+      <input id="start-project" />
+      <label>Start Time (Local)</label>
+      <input type="datetime-local" id="start-time" />
       <button id="btn-now-start">Now</button>
-    </label>
-    <label>Takeoff Lat: <input id="start-lat" type="text" /></label>
-    <label>Takeoff Lon: <input id="start-lon" type="text" /></label>
-    <button id="btn-gps-start">Use GPS</button>
-    <button id="btn-queue-start">Queue Start</button>
-  </section>
+      <label>Takeoff Lat</label>
+      <input id="start-lat" />
+      <label>Takeoff Lon</label>
+      <input id="start-lon" />
+      <button id="btn-gps-start">Use GPS</button>
+      <button id="btn-queue-start">Queue Start</button>
+    </section>
 
-  <section id="end-flight">
-    <h2>End flight</h2>
-    <label>Flight Name: <input id="end-flight-name" type="text" /></label>
-    <label>End Time (Local):
-      <input id="end-time" type="datetime-local" />
+    <!-- End Flight -->
+    <section>
+      <h2>End flight</h2>
+      <label>Flight Name</label>
+      <input id="end-flight-name" />
+      <label>End Time (Local)</label>
+      <input type="datetime-local" id="end-time" />
       <button id="btn-now-end">Now</button>
-    </label>
-    <button id="btn-queue-end">Queue End</button>
-  </section>
+      <button id="btn-queue-end">Queue End</button>
+    </section>
 
-  <section id="queue">
-    <h2>Queue / Sync</h2>
-    <button id="btn-show-queue">Show queue</button>
-    <button id="btn-clear-queue">Clear queue</button>
-    <button id="btn-sync">Sync</button>
-  </section>
+    <!-- Queue -->
+    <section>
+      <h2>Queue & Sync</h2>
+      <button id="btn-show-queue">Show Queue</button>
+      <button id="btn-clear-queue">Clear Queue</button>
+      <button id="btn-sync">Sync</button>
+      <pre id="log-console"></pre>
+    </section>
+  </main>
 
-  <pre id="log-console"></pre>
-
-  <!-- Import modules -->
-  <script type="module" src="timezones.js"></script>
-  <script type="module">
-    import { APP_CONFIG, AUTH_CONFIG } from './config.js';
-    window.APP_CONFIG = APP_CONFIG;
-    window.AUTH_CONFIG = AUTH_CONFIG;
-    import './app.js';
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-      });
-    }
-  </script>
+  <script src="timezones.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
