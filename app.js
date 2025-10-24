@@ -1,28 +1,11 @@
-// app.js
-// Drone LogBook — main app logic
-// - Google sign-in via GIS (no CORS issues)
-// - Settings stored in localStorage
-// - Offline queue for start/end records
-// - Sync to Google Apps Script Web App endpoint (POST JSON)
-// - Microsoft hooks (placeholder)
+// app.js — Drone LogBook (Easy Mode: direct Google Sheets sync)
 
 (() => {
-  const CONFIG = window.APP_CONFIG || {
-    appName: "Drone LogBook",
-    version: "1.0.0",
-    defaultTimezone: "UTC",
-    redirectUri: location.origin + location.pathname,
-    storageKeyPrefix: "drone_logbook_",
-  };
+  const CONFIG = window.APP_CONFIG;
+  const AUTH = window.AUTH_CONFIG;
 
-  const AUTH = window.AUTH_CONFIG || {
-    google: { clientId: "", scopes: "openid email profile" },
-    microsoft: { clientId: "", scopes: "openid email profile User.Read" },
-  };
-
-  // ---------- DOM ----------
+  // ---------- DOM helpers ----------
   const $ = (id) => document.getElementById(id);
-
   const el = {
     // auth
     btnGoogle: $("btn-google"),
@@ -32,9 +15,6 @@
     // settings
     provider: $("provider"),
     timezone: $("timezone"),
-    googleEndpoint: $("google-endpoint"),
-    msDriveItem: $("ms-driveitem"),
-    msTable: $("ms-table"),
     providerGoogle: $("provider-google"),
     providerMicrosoft: $("provider-microsoft"),
     btnSaveSettings: $("btn-save-settings"),
@@ -62,9 +42,8 @@
     logConsole: $("log-console"),
   };
 
-  // ---------- Storage helpers ----------
+  // ---------- Storage ----------
   const k = (name) => `${CONFIG.storageKeyPrefix}${name}`;
-
   const S = {
     get(name, fallback = null) {
       try {
@@ -88,151 +67,236 @@
     el.logConsole.textContent += `[${ts}] ${line}\n`;
     el.logConsole.scrollTop = el.logConsole.scrollHeight;
   }
-  function toast(line) { log(line); }
+  const toast = log;
 
   // ---------- UI helpers ----------
-  function setHidden(elm, hidden) { elm.classList.toggle("hidden", hidden); }
-  function updateSignedInUI(text) { el.signedInAs.textContent = text || "Not signed in"; }
+  function setHidden(node, hidden) {
+    node.classList.toggle("hidden", hidden);
+  }
+  function updateSignedInUI(text) {
+    el.signedInAs.textContent = text || "Not signed in";
+  }
 
-  // ---------- Timezone ----------
+  // ---------- Timezones ----------
   function populateTimezones() {
     const zones =
       (window.TIMEZONES && Array.isArray(window.TIMEZONES) && window.TIMEZONES) ||
-      ["UTC","America/Vancouver","America/Los_Angeles","America/New_York","Europe/London","Europe/Paris","Asia/Tokyo","Australia/Sydney"];
+      ["UTC", "America/Vancouver", "America/Los_Angeles", "America/New_York", "Europe/London"];
     el.timezone.innerHTML = "";
-    zones.forEach((z) => {
+    for (const z of zones) {
       const opt = document.createElement("option");
-      opt.value = z; opt.textContent = z; el.timezone.appendChild(opt);
-    });
-    const saved = S.get("timezone");
-    el.timezone.value = saved || CONFIG.defaultTimezone || "UTC";
+      opt.value = z;
+      opt.textContent = z;
+      el.timezone.appendChild(opt);
+    }
+    el.timezone.value = S.get("timezone", CONFIG.defaultTimezone);
   }
-
   function localNowForInput() {
     const d = new Date();
     const pad = (n) => String(n).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    const mm = pad(d.getMonth() + 1);
-    const dd = pad(d.getDate());
-    const hh = pad(d.getHours());
-    const mi = pad(d.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+      d.getMinutes()
+    )}`;
   }
 
   // ---------- Settings ----------
   function loadSettings() {
     const provider = S.get("provider", "");
     el.provider.value = provider || "";
-
-    const tz = S.get("timezone", CONFIG.defaultTimezone);
-    el.timezone.value = tz;
-
-    el.googleEndpoint.value = S.get("google_endpoint", "") || "";
-    el.msDriveItem.value = S.get("ms_driveitem", "") || "";
-    el.msTable.value = S.get("ms_table", "FlightLogTable") || "FlightLogTable";
-
-    setHidden(el.providerGoogle, provider !== "google");
-    setHidden(el.providerMicrosoft, provider !== "microsoft");
+    el.timezone.value = S.get("timezone", CONFIG.defaultTimezone);
+    setHidden(el.providerGoogle, true);       // hidden in Easy Mode
+    setHidden(el.providerMicrosoft, provider !== "microsoft"); // keep MS placeholder hidden by default
   }
-
   function saveSettings() {
     const provider = el.provider.value.trim();
     const tz = el.timezone.value.trim();
-
     S.set("provider", provider || "");
     S.set("timezone", tz || CONFIG.defaultTimezone);
-
-    if (provider === "google") {
-      S.set("google_endpoint", el.googleEndpoint.value.trim());
-    } else if (provider === "microsoft") {
-      S.set("ms_driveitem", el.msDriveItem.value.trim());
-      S.set("ms_table", el.msTable.value.trim() || "FlightLogTable");
-    }
-    toast("Settings saved.");
-    setHidden(el.providerGoogle, provider !== "google");
+    setHidden(el.providerGoogle, true);
     setHidden(el.providerMicrosoft, provider !== "microsoft");
+    toast("Settings saved.");
   }
 
   // ---------- Queue ----------
-  function getQueue() { return S.get("queue", []); }
-  function setQueue(arr) { S.set("queue", arr); }
+  const getQueue = () => S.get("queue", []);
+  const setQueue = (arr) => S.set("queue", arr);
   function addToQueue(item) {
-    const q = getQueue(); q.push(item); setQueue(q);
+    const q = getQueue();
+    q.push(item);
+    setQueue(q);
     toast(`Queued: ${item.type} — ${item.flightName}`);
   }
-  function clearQueue() { setQueue([]); toast("Queue cleared."); }
+  function clearQueue() {
+    setQueue([]);
+    toast("Queue cleared.");
+  }
   function showQueue() {
-    const q = getQueue(); if (!q.length) return toast("Queue is empty.");
-    toast(`Queue (${q.length} item(s)):\n` + JSON.stringify(q, null, 2));
+    const q = getQueue();
+    if (!q.length) return toast("Queue is empty.");
+    toast(`Queue (${q.length}):\n` + JSON.stringify(q, null, 2));
   }
 
   // ---------- GPS ----------
   function getGPSForStart() {
-    if (!navigator.geolocation) return alert("Geolocation not supported in this browser.");
+    if (!navigator.geolocation) return alert("Geolocation not supported.");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
-        el.startLat.value = latitude.toFixed(6);
-        el.startLon.value = longitude.toFixed(6);
-        toast(`GPS acquired: ${el.startLat.value}, ${el.startLon.value}`);
+        el.startLat.value = pos.coords.latitude.toFixed(6);
+        el.startLon.value = pos.coords.longitude.toFixed(6);
+        toast(`GPS: ${el.startLat.value}, ${el.startLon.value}`);
       },
-      (err) => alert("Failed to get GPS: " + err.message),
-      { enableHighAccuracy: true, timeout: 10_000 }
+      (err) => alert("GPS failed: " + err.message),
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   }
 
   // ---------- Google Sign-in (GIS) ----------
   function signInWithGoogle() {
-    try {
-      if (!window.google || !google.accounts || !google.accounts.oauth2) {
-        alert("Google Identity Services SDK didn't load (check network or ad-blockers)."); return;
-      }
-      if (!AUTH.google.clientId) { alert("Missing Google Client ID in config.js"); return; }
-
-      const tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: AUTH.google.clientId,
-        scope: AUTH.google.scopes || "openid email profile",
-        callback: (response) => {
-          if (!response || !response.access_token) {
-            console.error("Google sign-in: no access token", response);
-            alert("Google sign-in failed (no token)."); return;
-          }
-          fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-            headers: { Authorization: `Bearer ${response.access_token}` },
-          })
-            .then((r) => r.json())
-            .then((profile) => {
-              const email = profile.email || "";
-              S.set("provider", "google");
-              S.set("user_email", email);
-              S.set("google_access_token", response.access_token);
-              updateSignedInUI(`Signed in as ${email}`);
-              el.provider.value = "google";
-              setHidden(el.providerGoogle, false);
-              setHidden(el.providerMicrosoft, true);
-              toast("Google sign-in OK.");
-            })
-            .catch((e) => {
-              console.error("Fetch profile failed", e);
-              alert("Signed in, but failed to fetch Google profile.");
-            });
-        },
-      });
-
-      tokenClient.requestAccessToken({ prompt: "consent" });
-    } catch (e) {
-      console.error(e); alert("Google sign-in error (see console).");
+    if (!window.google?.accounts?.oauth2) {
+      return alert("Google Identity Services SDK didn't load.");
     }
+    if (!AUTH.google.clientId) return alert("Missing Google Client ID in config.js");
+
+    const tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: AUTH.google.clientId,
+      scope: AUTH.google.scopes,
+      callback: (resp) => {
+        if (!resp?.access_token) {
+          console.error("No token", resp);
+          return alert("Google sign-in failed.");
+        }
+        S.set("google_access_token", resp.access_token);
+        // fetch profile
+        fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${resp.access_token}` },
+        })
+          .then((r) => r.json())
+          .then((profile) => {
+            const email = profile.email || "";
+            S.set("provider", "google");
+            S.set("user_email", email);
+            updateSignedInUI(`Signed in as ${email}`);
+            el.provider.value = "google";
+            setHidden(el.providerMicrosoft, true);
+            toast("Google sign-in OK.");
+          })
+          .catch((e) => {
+            console.error(e);
+            alert("Signed in, but failed to fetch profile.");
+          });
+      },
+    });
+
+    tokenClient.requestAccessToken({ prompt: "consent" });
   }
 
-  // ---------- Microsoft Sign-in (placeholder) ----------
-  function signInWithMicrosoft() {
-    S.set("provider", "microsoft");
-    updateSignedInUI("Microsoft: sign-in pending setup");
-    el.provider.value = "microsoft";
-    setHidden(el.providerGoogle, true);
-    setHidden(el.providerMicrosoft, false);
-    toast("Microsoft sign-in not yet configured.");
+  // ---------- Google Sheets helpers ----------
+  const SHEET_NAME = "Flight Log";
+  const HEADER = [
+    "Timestamp (UTC)",
+    "Timezone",
+    "Flight Name",
+    "Project / Job",
+    "Start Time (Local)",
+    "Takeoff Lat",
+    "Takeoff Lon",
+    "End Time (Local)"
+  ];
+
+  function gFetch(url, options = {}) {
+    const token = S.get("google_access_token", "");
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+  }
+
+  async function ensureGoogleSheet() {
+    let sheetId = S.get("google_sheet_id", "");
+    if (sheetId) return sheetId;
+
+    const email = S.get("user_email", "Me");
+    // 1) Create spreadsheet with our tab name
+    const createRes = await gFetch("https://sheets.googleapis.com/v4/spreadsheets", {
+      method: "POST",
+      body: JSON.stringify({
+        properties: { title: `Drone LogBook (${email})` },
+        sheets: [{ properties: { title: SHEET_NAME } }],
+      }),
+    });
+    if (!createRes.ok) throw new Error(`Create spreadsheet failed: ${createRes.status}`);
+    const created = await createRes.json();
+    sheetId = created.spreadsheetId;
+
+    // 2) Write header row
+    const appendHeader = await gFetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(
+        SHEET_NAME
+      )}!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+      {
+        method: "POST",
+        body: JSON.stringify({ values: [HEADER] }),
+      }
+    );
+    if (!appendHeader.ok) throw new Error(`Write header failed: ${appendHeader.status}`);
+
+    S.set("google_sheet_id", sheetId);
+    toast("Created Google Sheet and added header.");
+    return sheetId;
+  }
+
+  function recordToRow(rec) {
+    // Map our queued JSON into a row that matches HEADER order
+    return [
+      new Date(rec.timestamp).toISOString(),
+      rec.timezone || "",
+      rec.flightName || "",
+      rec.project || "",
+      rec.startLocal || "",
+      rec.takeoffLat || "",
+      rec.takeoffLon || "",
+      rec.endLocal || ""
+    ];
+  }
+
+  async function syncQueueGoogle() {
+    const queue = getQueue();
+    if (!queue.length) return toast("Nothing to sync.");
+
+    // Make sure signed in
+    if (!S.get("google_access_token")) {
+      alert("Please sign in with Google first.");
+      return;
+    }
+
+    const sheetId = await ensureGoogleSheet();
+
+    // Convert items to rows
+    const rows = queue.map(recordToRow);
+
+    const res = await gFetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(
+        SHEET_NAME
+      )}!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+      {
+        method: "POST",
+        body: JSON.stringify({ values: rows }),
+      }
+    );
+
+    if (!res.ok) {
+      const msg = await res.text();
+      console.error(msg);
+      toast("Sync failed: " + msg);
+      return;
+    }
+
+    toast(`Synced ${rows.length} row(s) to Google Sheets.`);
+    clearQueue();
   }
 
   // ---------- Create queue items ----------
@@ -247,6 +311,7 @@
       startLocal: el.startTime.value,
       takeoffLat: el.startLat.value.trim(),
       takeoffLon: el.startLon.value.trim(),
+      endLocal: "", // filled on end
     };
     if (!rec.flightName) return alert("Please enter a Flight Name.");
     if (!rec.startLocal) return alert("Please set Start Time.");
@@ -267,89 +332,60 @@
     addToQueue(rec);
   }
 
-  // ---------- Sync ----------
+  // ---------- Sync (router) ----------
   async function syncQueue() {
-    const provider = S.get("provider", el.provider.value || "");
-    const queue = getQueue();
-    if (!queue.length) return toast("Nothing to sync — queue is empty.");
-
-    if (provider === "google") {
-      const endpoint = el.googleEndpoint.value.trim() || S.get("google_endpoint", "");
-      if (!endpoint) return alert("Enter Google Endpoint (Apps Script Web App URL) in Settings.");
-      let success = 0;
-      for (const item of queue) {
-        try {
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(item),
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          success++;
-          toast(`Synced → Google: ${item.type} / ${item.flightName}`);
-        } catch (e) {
-          console.error("Google sync failed", e);
-          toast(`Failed → Google: ${item.type} / ${item.flightName} — ${e.message}`);
-        }
-      }
-      if (success === queue.length) { clearQueue(); toast("All items synced to Google."); }
-      else { toast("Some items failed. They remain in the queue."); }
+    const provider = S.get("provider", el.provider.value || "google") || "google";
+    if (provider !== "google") {
+      alert("Microsoft sync not implemented yet. Choose Google.");
       return;
     }
-
-    if (provider === "microsoft") {
-      alert("Microsoft sync not yet implemented.");
-      return;
+    try {
+      await syncQueueGoogle();
+    } catch (e) {
+      console.error(e);
+      toast("Sync error: " + e.message);
     }
-
-    alert("Choose a provider in Settings (Google or Microsoft).");
   }
 
-  // ---------- Event bindings (safe) ----------
+  // ---------- Bind events ----------
   function bindEvents() {
-    const on = (elem, evt, fn) => { if (elem) elem.addEventListener(evt, fn); };
+    el.btnGoogle?.addEventListener("click", signInWithGoogle);
+    el.btnMicrosoft?.addEventListener("click", () => alert("Microsoft sign-in not yet implemented."));
+    el.btnSaveSettings?.addEventListener("click", saveSettings);
 
-    // sign-in
-    on(el.btnGoogle, "click", signInWithGoogle);
-    on(el.btnMicrosoft, "click", signInWithMicrosoft);
-
-    // settings
-    on(el.btnSaveSettings, "click", saveSettings);
-    on(el.provider, "change", (e) => {
+    el.provider?.addEventListener("change", (e) => {
       const v = e.target.value;
-      setHidden(el.providerGoogle, v !== "google");
       setHidden(el.providerMicrosoft, v !== "microsoft");
     });
 
-    // start
-    on(el.btnNowStart, "click", () => (el.startTime.value = localNowForInput()));
-    on(el.btnGPSStart, "click", getGPSForStart);
-    on(el.btnQueueStart, "click", queueStart);
+    el.btnNowStart?.addEventListener("click", () => (el.startTime.value = localNowForInput()));
+    el.btnGPSStart?.addEventListener("click", getGPSForStart);
+    el.btnQueueStart?.addEventListener("click", queueStart);
 
-    // end
-    on(el.btnNowEnd, "click", () => (el.endTime.value = localNowForInput()));
-    on(el.btnQueueEnd, "click", queueEnd);
+    el.btnNowEnd?.addEventListener("click", () => (el.endTime.value = localNowForInput()));
+    el.btnQueueEnd?.addEventListener("click", queueEnd);
 
-    // queue/sync
-    on(el.btnShowQueue, "click", showQueue);
-    on(el.btnClearQueue, "click", clearQueue);
-    on(el.btnSync, "click", syncQueue);
+    el.btnShowQueue?.addEventListener("click", showQueue);
+    el.btnClearQueue?.addEventListener("click", clearQueue);
+    el.btnSync?.addEventListener("click", syncQueue);
   }
 
   // ---------- Init ----------
   function init() {
     populateTimezones();
     loadSettings();
+    el.startTime.value = localNowForInput();
+    el.endTime.value = "";
 
     const email = S.get("user_email", "");
     updateSignedInUI(email ? `Signed in as ${email}` : "Not signed in");
 
-    el.startTime.value = localNowForInput();
-    el.endTime.value = "";
+    // Hide Google endpoint settings in Easy Mode
+    setHidden(el.providerGoogle, true);
 
     bindEvents();
     log(`${CONFIG.appName} v${CONFIG.version} ready.`);
-    if (!navigator.onLine) log("You are offline. Queue entries and sync when back online.");
+    if (!navigator.onLine) log("You are offline. Queue items; sync when back online.");
   }
 
   document.addEventListener("DOMContentLoaded", init);
