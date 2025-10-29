@@ -1,106 +1,79 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
   <title>Drone LogBook</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0a192f" />
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="styles.css" />
-
-  <!-- Google Identity Services -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- Config -->
-  <script src="config.js"></script>
+  <!-- Styles (optional) -->
+  <style>
+    body { background:#0d1117; color:#e6edf3; font-family:system-ui, Arial; }
+    .container { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    button { background:#238636; border:0; color:white; padding:8px 12px; border-radius:6px; cursor:pointer; }
+    button.secondary { background:#30363d; }
+    .card { background:#161b22; border:1px solid #30363d; padding:16px; border-radius:10px; margin:16px 0; }
+    .hidden { display:none; }
+    small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
 </head>
 <body>
-  <header>
+  <div class="container">
     <h1>Drone LogBook</h1>
-    <p>Offline-first logbook. Choose Google or Microsoft.</p>
-  </header>
 
-  <main>
-    <!-- Sign-in -->
-    <section>
-      <h2>Sign in</h2>
-      <button id="btn-google">Sign in with Google</button>
-      <button id="btn-microsoft">Sign in with Microsoft</button>
-      <p id="signed-in-as">Not signed in</p>
-    </section>
+    <div class="card">
+      <div class="row">
+        <button id="btn-google">Sign in with Google</button>
+        <button id="btn-microsoft" class="secondary">Sign in with Microsoft</button>
+        <div id="signed-in-as" class="row" style="margin-left:auto;">Not signed in</div>
+      </div>
+    </div>
 
-    <!-- Settings -->
-    <section>
-      <h2>Settings</h2>
-      <label>Provider</label>
-      <select id="provider">
-        <option value="">— choose —</option>
-        <option value="google">Google</option>
-        <option value="microsoft">Microsoft</option>
-      </select>
-
-      <label>Timezone</label>
-      <select id="timezone"></select>
-
-      <div id="provider-google" class="provider-section hidden">
-        <label>Google Endpoint (Apps Script URL)</label>
-        <input id="google-endpoint" placeholder="https://script.google.com/macros/s/..." />
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="row">
+        <label for="provider">Provider:&nbsp;</label>
+        <select id="provider">
+          <option value="">— choose —</option>
+          <option value="google">Google</option>
+          <option value="microsoft">Microsoft</option>
+        </select>
       </div>
 
-      <div id="provider-microsoft" class="provider-section hidden">
-        <label>Drive Item ID</label>
-        <input id="ms-driveitem" />
-        <label>Table Name</label>
-        <input id="ms-table" value="FlightLogTable" />
+      <!-- Google-specific settings section -->
+      <div id="provider-google" class="card hidden">
+        <h4>Google</h4>
+        <div class="row">
+          <label for="google-endpoint">Google Endpoint (Apps Script URL):</label>
+          <input id="google-endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;" />
+        </div>
       </div>
 
-      <button id="btn-save-settings">Save settings</button>
-    </section>
+      <!-- Microsoft-specific settings section -->
+      <div id="provider-microsoft" class="card hidden">
+        <h4>Microsoft</h4>
+        <p>Nothing to set here right now — sign in above. We’ll use your OneDrive/SharePoint via Graph.</p>
+      </div>
 
-    <!-- Start Flight -->
-    <section>
-      <h2>New flight (Start)</h2>
-      <label>Flight Name</label>
-      <input id="start-flight-name" />
-      <label>Project / Job</label>
-      <input id="start-project" />
-      <label>Start Time (Local)</label>
-      <input type="datetime-local" id="start-time" />
-      <button id="btn-now-start">Now</button>
-      <label>Takeoff Lat</label>
-      <input id="start-lat" />
-      <label>Takeoff Lon</label>
-      <input id="start-lon" />
-      <button id="btn-gps-start">Use GPS</button>
-      <button id="btn-queue-start">Queue Start</button>
-    </section>
+      <div class="row" style="margin-top:8px;">
+        <button id="btn-save-settings" class="secondary">Save settings</button>
+      </div>
+    </div>
 
-    <!-- End Flight -->
-    <section>
-      <h2>End flight</h2>
-      <label>Flight Name</label>
-      <input id="end-flight-name" />
-      <label>End Time (Local)</label>
-      <input type="datetime-local" id="end-time" />
-      <button id="btn-now-end">Now</button>
-      <button id="btn-queue-end">Queue End</button>
-    </section>
+    <div class="card">
+      <h3>Console</h3>
+      <pre id="log-console" style="min-height:120px; max-height:260px; overflow:auto; background:#0b0f14; padding:12px; border-radius:8px;"></pre>
+    </div>
+  </div>
 
-    <!-- Queue -->
-    <section>
-      <h2>Queue & Sync</h2>
-      <button id="btn-show-queue">Show Queue</button>
-      <button id="btn-clear-queue">Clear Queue</button>
-      <button id="btn-sync">Sync</button>
-      <pre id="log-console"></pre>
-    </section>
-  </main>
+  <!-- Google Identity Services (for OAuth tokens) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <script src="timezones.js"></script>
+  <!-- MSAL Browser (Auth Code + PKCE) -->
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+
+  <!-- Your config first, then app logic -->
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
