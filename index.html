@@ -8,11 +8,11 @@
   <!-- MSAL for Microsoft Login -->
   <script defer src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 
-  <!-- Google API SDK -->
+  <!-- Google Identity Services -->
   <script async defer src="https://accounts.google.com/gsi/client"></script>
 
-  <!-- Your configuration and app logic -->
-  <script defer src="./config.js"></script>
+  <!-- Your configuration MUST load before app.js -->
+  <script defer src="./auth-config.js"></script>
   <script defer src="./app.js"></script>
 
   <style>
@@ -31,9 +31,7 @@
       border-radius: 10px;
       box-shadow: 0 0 10px rgba(0,0,0,0.4);
     }
-    h1 {
-      color: #4fc3f7;
-    }
+    h1 { color: #4fc3f7; }
     button {
       margin-right: 10px;
       padding: 10px 20px;
@@ -44,15 +42,9 @@
       color: white;
       font-size: 15px;
     }
-    button.google {
-      background-color: #db4437;
-    }
-    button.microsoft {
-      background-color: #0078d7;
-    }
-    .section {
-      margin-top: 25px;
-    }
+    button.google { background-color: #db4437; }
+    button.microsoft { background-color: #0078d7; }
+    .section { margin-top: 25px; }
     input {
       width: 100%;
       padding: 8px;
