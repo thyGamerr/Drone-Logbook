@@ -1,79 +1,106 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Drone LogBook</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Styles (optional) -->
+  <!-- MSAL for Microsoft Login -->
+  <script defer src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+
+  <!-- Google API SDK -->
+  <script async defer src="https://accounts.google.com/gsi/client"></script>
+
+  <!-- Your configuration and app logic -->
+  <script defer src="./config.js"></script>
+  <script defer src="./app.js"></script>
+
   <style>
-    body { background:#0d1117; color:#e6edf3; font-family:system-ui, Arial; }
-    .container { max-width: 980px; margin: 24px auto; padding: 0 16px; }
-    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    button { background:#238636; border:0; color:white; padding:8px 12px; border-radius:6px; cursor:pointer; }
-    button.secondary { background:#30363d; }
-    .card { background:#161b22; border:1px solid #30363d; padding:16px; border-radius:10px; margin:16px 0; }
-    .hidden { display:none; }
-    small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    body {
+      background-color: #121418;
+      color: white;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background-color: #181b22;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    }
+    h1 {
+      color: #4fc3f7;
+    }
+    button {
+      margin-right: 10px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #0078d7;
+      color: white;
+      font-size: 15px;
+    }
+    button.google {
+      background-color: #db4437;
+    }
+    button.microsoft {
+      background-color: #0078d7;
+    }
+    .section {
+      margin-top: 25px;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      border-radius: 5px;
+      border: 1px solid #333;
+      background-color: #222;
+      color: #fff;
+    }
+    .console {
+      background-color: #0f1116;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 15px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Drone LogBook</h1>
+    <h1>Drone LogBook v1.0.0</h1>
 
-    <div class="card">
-      <div class="row">
-        <button id="btn-google">Sign in with Google</button>
-        <button id="btn-microsoft" class="secondary">Sign in with Microsoft</button>
-        <div id="signed-in-as" class="row" style="margin-left:auto;">Not signed in</div>
-      </div>
+    <div>
+      <button id="btn-google" class="google">Sign in with Google</button>
+      <button id="btn-microsoft" class="microsoft">Sign in with Microsoft</button>
+      <span id="user-info"></span>
     </div>
 
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="row">
-        <label for="provider">Provider:&nbsp;</label>
-        <select id="provider">
-          <option value="">— choose —</option>
-          <option value="google">Google</option>
-          <option value="microsoft">Microsoft</option>
-        </select>
+    <div class="section">
+      <h2>Settings</h2>
+      <label for="provider">Provider:</label>
+      <select id="provider">
+        <option value="Google">Google</option>
+        <option value="Microsoft">Microsoft</option>
+      </select>
+
+      <div id="google-settings" style="margin-top:10px;">
+        <label for="google-endpoint">Google Endpoint (Apps Script URL):</label>
+        <input type="text" id="google-endpoint" placeholder="https://script.google.com/macros/s/.../exec">
       </div>
 
-      <!-- Google-specific settings section -->
-      <div id="provider-google" class="card hidden">
-        <h4>Google</h4>
-        <div class="row">
-          <label for="google-endpoint">Google Endpoint (Apps Script URL):</label>
-          <input id="google-endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;" />
-        </div>
-      </div>
-
-      <!-- Microsoft-specific settings section -->
-      <div id="provider-microsoft" class="card hidden">
-        <h4>Microsoft</h4>
-        <p>Nothing to set here right now — sign in above. We’ll use your OneDrive/SharePoint via Graph.</p>
-      </div>
-
-      <div class="row" style="margin-top:8px;">
-        <button id="btn-save-settings" class="secondary">Save settings</button>
-      </div>
+      <button id="save-settings" style="margin-top:10px;">Save settings</button>
     </div>
 
-    <div class="card">
-      <h3>Console</h3>
-      <pre id="log-console" style="min-height:120px; max-height:260px; overflow:auto; background:#0b0f14; padding:12px; border-radius:8px;"></pre>
+    <div class="section">
+      <h2>Console</h2>
+      <div id="console" class="console">[Ready]</div>
     </div>
   </div>
-
-  <!-- Google Identity Services (for OAuth tokens) -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- MSAL Browser (Auth Code + PKCE) -->
-  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
-
-  <!-- Your config first, then app logic -->
-  <script src="config.js"></script>
-  <script src="app.js"></script>
 </body>
 </html>
