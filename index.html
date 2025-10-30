@@ -8,90 +8,121 @@
   <!-- MSAL for Microsoft Login -->
   <script defer src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 
-  <!-- Google Identity Services -->
+  <!-- Google Identity Services SDK -->
   <script async defer src="https://accounts.google.com/gsi/client"></script>
 
-  <!-- Your configuration MUST load before app.js -->
+  <!-- [SCRIPT PATH] Your auth config (renamed from config.js to auth-config.js) -->
   <script defer src="./auth-config.js"></script>
+
+  <!-- Main app logic -->
   <script defer src="./app.js"></script>
 
   <style>
-    body {
-      background-color: #121418;
-      color: white;
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
+    :root {
+      --bg: #121418;
+      --panel: #181b22;
+      --accent: #4fc3f7;
+      --text: #ffffff;
+      --muted: #9aa4af;
+      --btn: #0078d7;
+      --btn-google: #db4437;
+      --border: #2b2f3a;
     }
-    .container {
-      max-width: 900px;
-      margin: auto;
-      background-color: #181b22;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    html, body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
+    .container { max-width: 960px; margin: 0 auto; padding: 24px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.25);
     }
-    h1 { color: #4fc3f7; }
+    h1 { margin: 0 0 10px; color: var(--accent); font-weight: 650; }
+    h2 { margin: 18px 0 10px; font-size: 18px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     button {
-      margin-right: 10px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      background-color: #0078d7;
-      color: white;
-      font-size: 15px;
+      appearance: none; border: 1px solid var(--border); color: var(--text);
+      background: var(--btn); padding: 10px 14px; border-radius: 8px; cursor: pointer;
+      font-weight: 600;
     }
-    button.google { background-color: #db4437; }
-    button.microsoft { background-color: #0078d7; }
-    .section { margin-top: 25px; }
-    input {
-      width: 100%;
-      padding: 8px;
-      border-radius: 5px;
-      border: 1px solid #333;
-      background-color: #222;
-      color: #fff;
+    button.google { background: var(--btn-google); border-color: #b13b31; }
+    button.microsoft { background: var(--btn); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input, select {
+      width: 100%; background: #11141a; color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+      outline: none;
     }
-    .console {
-      background-color: #0f1116;
-      padding: 10px;
-      border-radius: 5px;
-      margin-top: 15px;
-      font-family: monospace;
-      white-space: pre-wrap;
-    }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 720px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+    .hidden { display: none; }
+
+    .console { background: #0f1116; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; min-height: 120px; }
+    .muted { color: var(--muted); }
+    .spacer { height: 16px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Drone LogBook v1.0.0</h1>
+    <div class="card">
+      <h1>Drone LogBook <span class="muted">v1.0.0</span></h1>
 
-    <div>
-      <button id="btn-google" class="google">Sign in with Google</button>
-      <button id="btn-microsoft" class="microsoft">Sign in with Microsoft</button>
-      <span id="user-info"></span>
-    </div>
-
-    <div class="section">
-      <h2>Settings</h2>
-      <label for="provider">Provider:</label>
-      <select id="provider">
-        <option value="Google">Google</option>
-        <option value="Microsoft">Microsoft</option>
-      </select>
-
-      <div id="google-settings" style="margin-top:10px;">
-        <label for="google-endpoint">Google Endpoint (Apps Script URL):</label>
-        <input type="text" id="google-endpoint" placeholder="https://script.google.com/macros/s/.../exec">
+      <div class="row" style="margin-top: 8px;">
+        <button id="btn-google" class="google">Sign in with Google</button>
+        <button id="btn-microsoft" class="microsoft">Sign in with Microsoft</button>
+        <span id="signed-in-as" class="muted"></span>  <!-- [ID FIX] was user-info -->
       </div>
 
-      <button id="save-settings" style="margin-top:10px;">Save settings</button>
-    </div>
+      <div class="spacer"></div>
 
-    <div class="section">
+      <h2>Settings</h2>
+      <div class="grid grid-2">
+        <div>
+          <label for="provider">Provider</label>
+          <!-- [VALUE FIX] values are lowercase to match app.js -->
+          <select id="provider">
+            <option value="google">Google</option>
+            <option value="microsoft">Microsoft</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- [ID FIX] provider-google -->
+      <div id="provider-google" style="margin-top: 12px;">
+        <div class="grid">
+          <div>
+            <label for="google-endpoint">Google Endpoint (Apps Script URL)</label>
+            <input id="google-endpoint" type="text" placeholder="https://script.google.com/macros/s/.../exec" />
+          </div>
+        </div>
+      </div>
+
+      <!-- [ADD SECTION] provider-microsoft, with IDs used by app.js -->
+      <div id="provider-microsoft" class="hidden" style="margin-top: 12px;">
+        <div class="grid grid-2">
+          <div>
+            <label for="ms-driveitem">Drive Item ID (Excel file in OneDrive/SharePoint)</label>
+            <input id="ms-driveitem" type="text" placeholder="01ABCDEF... (optional for now)" />
+          </div>
+          <div>
+            <label for="ms-table">Table Name</label>
+            <input id="ms-table" type="text" placeholder="FlightLogTable" />
+          </div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top: 14px;">
+        <button id="btn-save-settings">Save settings</button>
+      </div>
+
+      <div class="spacer"></div>
+
       <h2>Console</h2>
-      <div id="console" class="console">[Ready]</div>
+      <!-- [ID FIX] console -> log-console -->
+      <div id="log-console" class="console">[Ready]</div>
     </div>
   </div>
 </body>
