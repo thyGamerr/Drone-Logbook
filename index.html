@@ -19,7 +19,7 @@
       --text:#fff;--muted:#9aa4af;--accent:#4fc3f7;
       --ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--btn:#0078d7;--btn-google:#db4437;
     }
-    html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;}
+    html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;min-height:100%;}
     .container{max-width:960px;margin:auto;padding:24px;}
     .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 4px 24px rgba(0,0,0,.25);}
     h1{margin:0 0 10px;color:var(--accent);} h2{margin:18px 0 10px;font-size:18px;}
@@ -37,16 +37,19 @@
     #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f1116;border:1px solid var(--border);
       border-radius:10px;padding:10px 14px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999;}
     #toast.show{opacity:1;}#toast.ok{color:var(--ok);}#toast.warn{color:var(--warn);}#toast.err{color:var(--err);}
-    .support{font-size:13px;color:var(--muted);margin-top:8px}
     .inline-actions{display:flex;gap:8px;align-items:center}
     .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:12px}
+    .help{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
     .hidden{display:none;}
+    .btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;}
+    footer.support-footer{max-width:960px;margin:32px auto 20px auto;padding:0 24px;color:#fff;font-size:18px;}
+    footer.support-footer a{color:#fff;text-decoration:underline;}
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
-      <h1>Drone LogBook <span class="muted">v1.1.0</span></h1>
+      <h1>Drone LogBook <span class="muted">v1.1.1</span></h1>
 
       <div class="row">
         <button id="btn-google" class="google">Sign in with Google</button>
@@ -65,21 +68,22 @@
         </div>
       </div>
 
-      <div id="provider-google" style="margin-top:12px;">
-        <div class="grid">
-          <div>
-            <label for="google-endpoint">Google Endpoint (Apps Script URL)</label>
-            <input id="google-endpoint" type="text" placeholder="https://script.google.com/macros/s/.../exec">
-          </div>
-        </div>
+      <!-- Endpoint is hidden/locked in app.js -->
+      <input id="google-endpoint" type="hidden" />
 
+      <div id="provider-google" style="margin-top:12px;">
         <div class="grid" style="margin-top:10px;">
           <div>
             <label for="target-sheet-id">Target Sheet or Folder URL (Shared OK)</label>
             <div class="inline-actions">
-              <input id="target-sheet-id" type="text" placeholder="Paste Sheet URL/ID or Shared Drive folder URL" style="flex:1">
+              <input id="target-sheet-id" type="text" placeholder="Paste a Shared Drive folder link OR a Google Sheet link" style="flex:1">
               <button id="btn-validate-link" type="button">Validate Link</button>
               <span id="validate-status" class="pill muted">Not validated</span>
+            </div>
+            <div class="help">
+              • <b>Shared</b>: paste a Shared-Drive <i>folder</i> link (we’ll auto-create “Flight Log”) or a Sheet link.<br>
+              • <b>Personal</b>: no link needed — saves to <i>your</i> My Drive (tab “Flight Log”).<br>
+              • Use <b>Validate Link</b> to check permissions before syncing.
             </div>
           </div>
         </div>
@@ -105,11 +109,6 @@
 
       <h2>Console</h2>
       <div id="log-console" class="console">[Ready]</div>
-
-      <div class="support">
-        For support please contact
-        <a href="mailto:marineliaison4@tsoukenation.com">marineliaison4@tsoukenation.com</a>
-      </div>
     </div>
 
     <!-- FLIGHT LOG CARD -->
@@ -147,13 +146,17 @@
       <div class="grid grid-3">
         <div><label for="start-local">Start Time (local)</label><input id="start-local" type="datetime-local"></div>
         <div><label for="end-local">End Time (local)</label><input id="end-local" type="datetime-local"></div>
-        <div class="row"><button id="btn-now-start">Now → Start</button><button id="btn-now-end">Now → End</button></div>
+        <div class="btn-row">
+          <button id="btn-now-start">Now → Start</button>
+          <button id="btn-now-end">Now → End</button>
+          <button id="btn-gps">Use GPS</button>
+        </div>
       </div>
 
       <div class="grid grid-3">
         <div><label for="takeoff-lat">Takeoff Lat</label><input id="takeoff-lat" type="text" placeholder="48.371299"></div>
         <div><label for="takeoff-lon">Takeoff Lon</label><input id="takeoff-lon" type="text" placeholder="-123.742839"></div>
-        <div class="row"><button id="btn-gps">Use GPS</button></div>
+        <div></div>
       </div>
 
       <div class="grid"><label for="notes">Notes</label><textarea id="notes" placeholder="Optional notes"></textarea></div>
@@ -165,6 +168,10 @@
             <option value="personal" selected>Personal (My Drive)</option>
             <option value="shared">Shared (Team Drive / Shared Folder)</option>
           </select>
+          <div class="help" id="drive-help">
+            Personal → saves to <b>your</b> My Drive (no link needed).<br>
+            Shared → paste a Shared-Drive folder/Sheet link in Settings.
+          </div>
         </div>
       </div>
 
@@ -176,6 +183,12 @@
       </div>
     </div>
   </div>
+
+  <footer class="support-footer">
+    For support please contact
+    <a class="support-link" href="mailto:marineliaison4@tsoukenation.com">marineliaison4@tsoukenation.com</a>
+  </footer>
+
   <div id="toast"></div>
 </body>
 </html>
