@@ -1,4 +1,4 @@
-const CACHE = 'dlb-v1';
+const CACHE = 'dlb-v2';
 const ASSETS = [
   '/', '/index.html', '/styles.css', '/app.js', '/config.js', '/timezones.js', '/manifest.json'
 ];
