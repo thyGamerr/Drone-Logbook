@@ -5,85 +5,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Drone LogBook</title>
 
-  <!-- MSAL for Microsoft Login -->
-  <script defer src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
-
-  <!-- Google Identity Services SDK -->
+  <!-- SDKs -->
   <script async defer src="https://accounts.google.com/gsi/client"></script>
+  <script defer src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 
   <!-- Configs -->
   <script defer src="./auth-config.js"></script>
-
-  <!-- Main app -->
   <script defer src="./app.js"></script>
 
   <style>
     :root {
-      --bg: #121418;
-      --panel: #181b22;
-      --accent: #4fc3f7;
-      --text: #ffffff;
-      --muted: #9aa4af;
-      --btn: #0078d7;
-      --btn-google: #db4437;
-      --border: #2b2f3a;
-      --ok: #22c55e;
-      --warn: #f59e0b;
-      --err: #ef4444;
+      --bg:#121418;--panel:#181b22;--border:#2b2f3a;
+      --text:#fff;--muted:#9aa4af;--accent:#4fc3f7;
+      --ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--btn:#0078d7;--btn-google:#db4437;
     }
-    html, body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-    .container { max-width: 960px; margin: 0 auto; padding: 24px; }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px 20px;
-      box-shadow: 0 4px 24px rgba(0,0,0,.25);
-      margin-bottom: 18px;
-    }
-    h1 { margin: 0 0 10px; color: var(--accent); font-weight: 650; }
-    h2 { margin: 18px 0 10px; font-size: 18px; }
-    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
-    @media (min-width: 720px) { .grid-2 { grid-template-columns: 1fr 1fr; } .grid-3 { grid-template-columns: 1fr 1fr 1fr; } }
-    button {
-      appearance: none; border: 1px solid var(--border); color: var(--text);
-      background: var(--btn); padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600;
-    }
-    button.google { background: var(--btn-google); border-color: #b13b31; }
-    button.microsoft { background: var(--btn); }
-    button:disabled { opacity: .6; cursor: not-allowed; }
-    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-    input, select, textarea {
-      width: 100%; background: #11141a; color: var(--text);
-      border: 1px solid var(--border); border-radius: 8px; padding: 10px;
-      outline: none; resize: vertical;
-    }
-    textarea { min-height: 90px; }
-    .muted { color: var(--muted); }
-    .hidden { display: none; }
-    .console { background: #0f1116; border: 1px solid var(--border); border-radius: 8px; padding: 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; min-height: 120px; }
-    /* Toast */
-    #toast {
-      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
-      background: #0f1116; border: 1px solid var(--border); color: var(--text);
-      padding: 10px 14px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
-      font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .25s ease; z-index: 9999;
-    }
-    #toast.show { opacity: 1; }
-    #toast.ok { border-color: #183024; color: var(--ok); }
-    #toast.warn { border-color: #3a2f18; color: var(--warn); }
-    #toast.err { border-color: #3a1818; color: var(--err); }
+    html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;}
+    .container{max-width:960px;margin:auto;padding:24px;}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 4px 24px rgba(0,0,0,.25);}
+    h1{margin:0 0 10px;color:var(--accent);} h2{margin:18px 0 10px;font-size:18px;}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
+    input,select,textarea{width:100%;background:#11141a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;resize:vertical;}
+    textarea{min-height:90px;}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .grid{display:grid;gap:14px;}
+    @media(min-width:720px){.grid-2{grid-template-columns:1fr 1fr}.grid-3{grid-template-columns:1fr 1fr 1fr}}
+    button{border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer;color:var(--text);background:var(--btn);}
+    button.google{background:var(--btn-google);} button.microsoft{background:var(--btn);}
+    button:disabled{opacity:.6;cursor:not-allowed;}
+    .muted{color:var(--muted);}
+    .console{background:#0f1116;border:1px solid var(--border);border-radius:8px;padding:12px;min-height:120px;font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap;}
+    #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f1116;border:1px solid var(--border);
+      border-radius:10px;padding:10px 14px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999;}
+    #toast.show{opacity:1;}#toast.ok{color:var(--ok);}#toast.warn{color:var(--warn);}#toast.err{color:var(--err);}
+    .support{font-size:13px;color:var(--muted);margin-top:8px}
+    .inline-actions{display:flex;gap:8px;align-items:center}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:12px}
+    .hidden{display:none;}
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- AUTH + SETTINGS -->
     <div class="card">
-      <h1>Drone LogBook <span class="muted">v1.0.0</span></h1>
+      <h1>Drone LogBook <span class="muted">v1.1.0</span></h1>
 
-      <div class="row" style="margin-top: 8px;">
+      <div class="row">
         <button id="btn-google" class="google">Sign in with Google</button>
         <button id="btn-microsoft" class="microsoft">Sign in with Microsoft</button>
         <span id="signed-in-as" class="muted"></span>
@@ -100,107 +65,117 @@
         </div>
       </div>
 
-      <div id="provider-google" style="margin-top: 12px;">
+      <div id="provider-google" style="margin-top:12px;">
         <div class="grid">
           <div>
             <label for="google-endpoint">Google Endpoint (Apps Script URL)</label>
-            <input id="google-endpoint" type="text" placeholder="https://script.google.com/macros/s/.../exec" />
+            <input id="google-endpoint" type="text" placeholder="https://script.google.com/macros/s/.../exec">
+          </div>
+        </div>
+
+        <div class="grid" style="margin-top:10px;">
+          <div>
+            <label for="target-sheet-id">Target Sheet or Folder URL (Shared OK)</label>
+            <div class="inline-actions">
+              <input id="target-sheet-id" type="text" placeholder="Paste Sheet URL/ID or Shared Drive folder URL" style="flex:1">
+              <button id="btn-validate-link" type="button">Validate Link</button>
+              <span id="validate-status" class="pill muted">Not validated</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div id="provider-microsoft" class="hidden" style="margin-top: 12px;">
+      <div id="provider-microsoft" class="hidden" style="margin-top:12px;">
         <div class="grid grid-2">
           <div>
-            <label for="ms-driveitem">Drive Item ID (Excel file in OneDrive/SharePoint)</label>
-            <input id="ms-driveitem" type="text" placeholder="01ABCDEF... (optional for now)" />
+            <label for="ms-driveitem">Drive Item ID (optional)</label>
+            <input id="ms-driveitem" type="text" placeholder="future use">
           </div>
           <div>
             <label for="ms-table">Table Name</label>
-            <input id="ms-table" type="text" placeholder="FlightLogTable" />
+            <input id="ms-table" type="text" placeholder="FlightLogTable">
           </div>
         </div>
       </div>
 
-      <div class="row" style="margin-top: 14px;">
+      <div class="row" style="margin-top:14px;">
         <button id="btn-save-settings">Save settings</button>
-        <span class="muted">Queue: <span id="queue-count">0</span> items</span>
+        <span class="muted">Queue: <span id="queue-count">0</span></span>
       </div>
 
       <h2>Console</h2>
       <div id="log-console" class="console">[Ready]</div>
+
+      <div class="support">
+        For support please contact
+        <a href="mailto:marineliaison4@tsoukenation.com">marineliaison4@tsoukenation.com</a>
+      </div>
     </div>
 
     <!-- FLIGHT LOG CARD -->
     <div class="card" id="flight-card">
       <h2>Flight Log</h2>
+
       <div class="grid grid-2">
-        <div>
-          <label for="flight-name">Flight Name</label>
-          <input id="flight-name" type="text" placeholder="Harbour Mapping Run 1">
-        </div>
-        <div>
-          <label for="project">Project</label>
-          <input id="project" type="text" placeholder="Sooke Harbour Eelgrass Survey">
-        </div>
+        <div><label for="flight-name">Flight Name</label><input id="flight-name" type="text" placeholder="Harbour Mapping Run 1"></div>
+        <div><label for="project">Project / Job</label><input id="project" type="text" placeholder="Sooke Harbour Eelgrass Survey"></div>
+      </div>
+
+      <div class="grid grid-2">
+        <div><label for="pilot-name">Pilot Name</label><input id="pilot-name" type="text" placeholder="Your name"></div>
+        <div><label for="observer">Observer / Ground Crew</label><input id="observer" type="text" placeholder="Optional"></div>
       </div>
 
       <div class="grid grid-3">
-        <div>
-          <label for="start-local">Start Time (local)</label>
-          <input id="start-local" type="datetime-local">
-        </div>
-        <div>
-          <label for="end-local">End Time (local)</label>
-          <input id="end-local" type="datetime-local">
-        </div>
-        <div style="display:flex; gap:10px; align-items:end;">
-          <button id="btn-now-start" type="button">Now → Start</button>
-          <button id="btn-now-end" type="button">Now → End</button>
-        </div>
+        <div><label for="drone-model">Drone Model</label><input id="drone-model" type="text" placeholder="Matrice 350 RTK"></div>
+        <div><label for="aircraft-id">Aircraft ID / S/N</label><input id="aircraft-id" type="text" placeholder="ABC12345"></div>
+        <div><label for="payload">Payload</label><input id="payload" type="text" placeholder="Zenmuse P1 / H30T"></div>
       </div>
 
       <div class="grid grid-3">
-        <div>
-          <label for="takeoff-lat">Takeoff Lat</label>
-          <input id="takeoff-lat" type="text" placeholder="48.371299">
-        </div>
-        <div>
-          <label for="takeoff-lon">Takeoff Lon</label>
-          <input id="takeoff-lon" type="text" placeholder="-123.742839">
-        </div>
-        <div style="display:flex; gap:10px; align-items:end;">
-          <button id="btn-gps" type="button">Use GPS</button>
-        </div>
+        <div><label for="mission-type">Mission Type</label><input id="mission-type" type="text" placeholder="Mapping / Inspection / Training"></div>
+        <div><label for="rtk-mode">RTK Mode</label><input id="rtk-mode" type="text" placeholder="Fixed / Float / None"></div>
+        <div><label for="airspace-method">Airspace Method</label><input id="airspace-method" type="text" placeholder="NAV Drone / NOTAM / ATC call"></div>
       </div>
 
-      <div class="grid">
-        <div>
-          <label for="notes">Notes</label>
-          <textarea id="notes" placeholder="Optional notes"></textarea>
-        </div>
+      <div class="grid grid-3">
+        <div><label for="start-wind">Start Wind (m/s)</label><input id="start-wind" type="number" step="0.1" placeholder="e.g., 3.2"></div>
+        <div><label for="start-wind-dir">Start Wind Dir (°)</label><input id="start-wind-dir" type="number" step="1" placeholder="0–359"></div>
+        <div class="row"><span class="muted">Auto-fills on “Now → Start”</span></div>
       </div>
+
+      <div class="grid grid-3">
+        <div><label for="start-local">Start Time (local)</label><input id="start-local" type="datetime-local"></div>
+        <div><label for="end-local">End Time (local)</label><input id="end-local" type="datetime-local"></div>
+        <div class="row"><button id="btn-now-start">Now → Start</button><button id="btn-now-end">Now → End</button></div>
+      </div>
+
+      <div class="grid grid-3">
+        <div><label for="takeoff-lat">Takeoff Lat</label><input id="takeoff-lat" type="text" placeholder="48.371299"></div>
+        <div><label for="takeoff-lon">Takeoff Lon</label><input id="takeoff-lon" type="text" placeholder="-123.742839"></div>
+        <div class="row"><button id="btn-gps">Use GPS</button></div>
+      </div>
+
+      <div class="grid"><label for="notes">Notes</label><textarea id="notes" placeholder="Optional notes"></textarea></div>
 
       <div class="grid grid-2">
         <div>
           <label for="drive-type">Drive Type</label>
           <select id="drive-type">
             <option value="personal" selected>Personal (My Drive)</option>
-            <option value="shared">Shared (Team Drive)</option>
+            <option value="shared">Shared (Team Drive / Shared Folder)</option>
           </select>
         </div>
       </div>
 
-      <div class="row" style="margin-top: 10px;">
-        <button id="btn-queue-start" type="button">Queue Start</button>
-        <button id="btn-queue-end" type="button">Queue End</button>
-        <button id="btn-sync" type="button">Sync Now</button>
-        <button id="btn-clear-queue" type="button" style="background:#30343f;">Clear Queue (local)</button>
+      <div class="row" style="margin-top:10px;">
+        <button id="btn-queue-start">Queue Start</button>
+        <button id="btn-queue-end">Queue End</button>
+        <button id="btn-sync">Sync Now</button>
+        <button id="btn-clear-queue" style="background:#30343f;">Clear Queue (local)</button>
       </div>
     </div>
   </div>
-
-  <!-- Toast -->
   <div id="toast"></div>
 </body>
 </html>
