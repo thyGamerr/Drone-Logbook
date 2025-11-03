@@ -4,7 +4,7 @@
   const AUTH = window.AUTH_CONFIG || {};
 
   // 🔒 Fixed backend endpoint (hidden from users)
-  const FIXED_GOOGLE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzSos_1S0xvLkGfdk6oCoTkznqt9g2uewkG3e4cq7Qt7DNhsBDjP73N30EomoLIyeY/exec";
+  const FIXED_GOOGLE_ENDPOINT = "https://script.google.com/macros/s/AKfycbwfot9kG0jXpc5YLOkNISPPZsXsoLA276_TEgShvbJdQHAD54oCMmbrJHEUo6jRM-e8/exec";
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
