@@ -1,7 +1,10 @@
-// app.js — Drone LogBook v1.1.0 (Validate Link + Shared folder/Sheet + Open-Meteo wind)
+// app.js — Drone LogBook v1.1.1 (endpoint hidden + validate + shared/personal + Open-Meteo)
 (() => {
-  const CFG = window.APP_CONFIG || { appName:"Drone LogBook", version:"1.1.0", storageKeyPrefix:"drone_logbook_" };
+  const CFG = window.APP_CONFIG || { appName:"Drone LogBook", version:"1.1.1", storageKeyPrefix:"drone_logbook_" };
   const AUTH = window.AUTH_CONFIG || {};
+
+  // 🔒 Fixed backend endpoint (hidden from users)
+  const FIXED_GOOGLE_ENDPOINT = "https://script.google.com/macros/s/AKfycbyHi8NstXaeidC8l_TOY3VwWayA8FBGcceNeqPSLIyTOW7v9Xk8oH-gZEfnRxnw44a/exec";
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
@@ -42,7 +45,7 @@
     notes: $("notes"),
     driveType: $("drive-type"),
 
-    // flight controls
+    // controls
     btnNowStart: $("btn-now-start"),
     btnNowEnd: $("btn-now-end"),
     btnGPS: $("btn-gps"),
@@ -51,8 +54,8 @@
     btnSync: $("btn-sync"),
     btnClearQueue: $("btn-clear-queue"),
 
-    // toast
-    toast: $("toast")
+    toast: $("toast"),
+    driveHelp: $("drive-help")
   };
 
   // ---------- Storage ----------
@@ -63,12 +66,11 @@
     remove(name) { localStorage.removeItem(k(name)); }
   };
 
-  // Queue helpers
+  // Queue
   const QKEY = "queue";
   const getQueue = () => S.get(QKEY, []);
   const setQueue = (arr) => { S.set(QKEY, arr); updateQueueCount(); };
   const pushQueue = (item) => { const q = getQueue(); q.push(item); setQueue(q); };
-
   function updateQueueCount() { if (el.queueCount) el.queueCount.textContent = String(getQueue().length); }
 
   // ---------- Logging / Toast ----------
@@ -92,16 +94,13 @@
     const d = new Date(); const pad = (n) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
-
-  // Parse either a Google Sheet URL/ID or a Drive folder URL -> { sheetId?, folderId? }
   function parseSheetOrFolder(input) {
-    const s = (input || "").trim();
-    if (!s) return {};
+    const s = (input || "").trim(); if (!s) return {};
     const mSheet = s.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
     if (mSheet) return { sheetId: mSheet[1] };
     const mFolder = s.match(/drive\/folders\/([a-zA-Z0-9-_]+)/);
     if (mFolder) return { folderId: mFolder[1] };
-    if (/^[a-zA-Z0-9-_]{20,}$/.test(s)) return { sheetId: s };
+    if (/^[a-zA-Z0-9-_]{20,}$/.test(s)) return { sheetId: s }; // raw id
     return {};
   }
 
@@ -109,22 +108,32 @@
   function loadSettings() {
     const provider = S.get("provider", "google");
     if (el.provider) el.provider.value = provider || "google";
-    if (el.googleEndpoint) el.googleEndpoint.value = S.get("google_endpoint", "") || "";
+    if (el.googleEndpoint) el.googleEndpoint.value = FIXED_GOOGLE_ENDPOINT; // keep in sync
+    S.set("google_endpoint", FIXED_GOOGLE_ENDPOINT);
     const savedTarget = S.get("target_link", "") || "";
     if (el.targetSheetId) el.targetSheetId.value = savedTarget;
     setHidden(el.providerGoogle, provider !== "google");
     setHidden(el.providerMicrosoft, provider !== "microsoft");
     resetValidateStatus();
+    updateDriveHelp();
   }
 
   function saveSettings() {
     const provider = el.provider?.value || "google";
     S.set("provider", provider);
-    S.set("google_endpoint", (el.googleEndpoint?.value || "").trim());
+    S.set("google_endpoint", FIXED_GOOGLE_ENDPOINT);
     if (el.targetSheetId) S.set("target_link", el.targetSheetId.value.trim());
     setHidden(el.providerGoogle, provider !== "google");
     setHidden(el.providerMicrosoft, provider !== "microsoft");
     toast("Settings saved.", "ok");
+  }
+
+  function updateDriveHelp() {
+    const v = el.driveType?.value || "personal";
+    if (!el.driveHelp) return;
+    el.driveHelp.innerHTML = (v === "personal")
+      ? `Personal → saves to <b>your</b> My Drive (no link needed).`
+      : `Shared → paste a Shared-Drive <b>folder</b> or <b>Sheet</b> link in Settings.`;
   }
 
   function resetValidateStatus() {
@@ -151,7 +160,7 @@
     }
   }
 
-  // ---------- GOOGLE SIGN-IN ----------
+  // ---------- Sign-in (Google) ----------
   function signInWithGoogle() {
     try {
       if (!window.google?.accounts?.oauth2) { alert("Google Identity Services SDK didn't load."); return; }
@@ -183,41 +192,10 @@
     } catch (e) { console.error(e); alert("Google sign-in error."); }
   }
 
-  // ---------- MICROSOFT SIGN-IN (placeholder kept) ----------
-  function signInWithMicrosoft() {
-    try {
-      const ms = AUTH.microsoft;
-      if (!ms?.clientId || !ms?.tenantId) { alert("Microsoft config missing."); return; }
-      if (!window.msal?.PublicClientApplication) { alert("MSAL Browser SDK didn't load."); return; }
-      const msalInstance = new msal.PublicClientApplication({
-        auth: { clientId: ms.clientId, authority: ms.authority, redirectUri: ms.redirectUri },
-        cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false }
-      });
-      const loginRequest = { scopes: ms.scopes, prompt: "select_account" };
-      msalInstance.loginPopup(loginRequest)
-        .then(loginResponse =>
-          msalInstance.acquireTokenSilent({ account: loginResponse.account, scopes: ms.scopes })
-            .catch(() => msalInstance.acquireTokenPopup({ scopes: ms.scopes }))
-        )
-        .then(tokenResponse => {
-          const token = tokenResponse.accessToken;
-          const account = tokenResponse.account;
-          const email = account?.username || account?.idTokenClaims?.preferred_username || "";
-          S.set("provider", "microsoft");
-          S.set("user_email", email);
-          S.set("ms_access_token", token);
-          S.set("ms_account", { homeAccountId: account.homeAccountId });
-          updateSignedInUI(`Signed in as ${email}`);
-          if (el.provider) el.provider.value = "microsoft";
-          setHidden(el.providerGoogle, true);
-          setHidden(el.providerMicrosoft, false);
-          toast("Microsoft sign-in OK.", "ok");
-        })
-        .catch(err => { console.error(err); alert("Microsoft sign-in failed."); });
-    } catch (e) { console.error(e); alert("Microsoft sign-in error."); }
-  }
+  // ---------- Microsoft placeholder ----------
+  function signInWithMicrosoft() { alert("Microsoft sign-in is coming soon."); }
 
-  // ---------- Wind (Open-Meteo) ----------
+  // ---------- Open-Meteo ----------
   async function fetchWind(lat, lon) {
     try {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m`;
@@ -232,10 +210,7 @@
       } else {
         toast("No wind data received.", "warn");
       }
-    } catch (e) {
-      console.error(e);
-      toast("Wind fetch failed.", "warn");
-    }
+    } catch { toast("Wind fetch failed.", "warn"); }
   }
 
   // ---------- Flight helpers ----------
@@ -271,12 +246,9 @@
     const rec = { ...base, type, timestamp: new Date().toISOString() };
     if (type === "start" && !rec.startLocal) rec.startLocal = nowLocalForInput();
     if (type === "end"   && !rec.endLocal)   rec.endLocal   = nowLocalForInput();
-
-    // If starting and we have coordinates but no wind, auto-fetch
     if (type === "start" && rec.takeoffLat && rec.takeoffLon && !rec.startWind) {
       fetchWind(rec.takeoffLat, rec.takeoffLon).catch(()=>{});
     }
-
     pushQueue(rec);
     toast(`Queued ${type} → ${rec.flightName || "(unnamed flight)"}`, "ok");
   }
@@ -297,8 +269,7 @@
   // ---------- Validate Link ----------
   async function validateLink() {
     resetValidateStatus();
-    const endpoint = (el.googleEndpoint?.value || "").trim();
-    if (!endpoint) { toast("Set Google endpoint first.", "warn"); setValidateErr("No endpoint"); return; }
+    const endpoint = FIXED_GOOGLE_ENDPOINT;
 
     const linkInfo = parseSheetOrFolder(el.targetSheetId?.value);
     if (!linkInfo.sheetId && !linkInfo.folderId) {
@@ -321,8 +292,7 @@
         setValidateErr(data?.error || "Probe failed");
         toast(`Validation failed: ${data?.error || res.status}`, "err");
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
       setValidateErr("Network error");
       toast("Network error during validation.", "err");
     }
@@ -330,8 +300,7 @@
 
   // ---------- Sync ----------
   async function syncNow() {
-    const endpoint = (el.googleEndpoint?.value || "").trim();
-    if (!endpoint) { toast("Set Google endpoint in Settings.", "warn"); return; }
+    const endpoint = FIXED_GOOGLE_ENDPOINT;
 
     const queue = getQueue();
     if (!queue.length) { toast("Nothing to sync.", "warn"); return; }
@@ -339,7 +308,7 @@
     const linkInfo = parseSheetOrFolder(el.targetSheetId?.value);
     const isShared = (el.driveType?.value === "shared");
     if (isShared && !linkInfo.sheetId && !linkInfo.folderId) {
-      toast("Shared selected → paste a Sheet URL/ID or a Shared Drive folder URL in Settings.", "warn");
+      toast("Shared selected → paste a Sheet or Shared-Drive folder link in Settings.", "warn");
       return;
     }
 
@@ -362,8 +331,7 @@
       } else {
         toast(`Failed to sync: ${data?.error || res.status}`, "err");
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast("Network error during sync.", "err");
     }
   }
@@ -381,9 +349,10 @@
       setHidden(el.providerMicrosoft, v !== "microsoft");
     });
 
+    el.driveType?.addEventListener("change", updateDriveHelp);
+
     el.btnNowStart?.addEventListener("click", async () => {
       if (el.startLocal) el.startLocal.value = nowLocalForInput();
-      // auto-wind if coords present
       const lat = el.takeoffLat?.value?.trim();
       const lon = el.takeoffLon?.value?.trim();
       if (lat && lon && !(el.startWind?.value)) await fetchWind(lat, lon);
@@ -398,7 +367,6 @@
     el.targetSheetId?.addEventListener("input", resetValidateStatus);
   }
 
-  // ---------- Init ----------
   function init() {
     loadSettings();
     const email = S.get("user_email", "");
