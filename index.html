@@ -42,8 +42,9 @@
     .help{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
     .hidden{display:none;}
     /* Button row alignment fix */
-    .btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;justify-content:flex-end;}
+    .btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;justify-content:flex-end;margin-right:20px;}
     .align-center{align-items:center;}
+    .wind-note{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4;text-align:right;padding-right:20px;}
     /* Footer */
     footer.support-footer{max-width:960px;margin:32px auto 20px auto;padding:0 24px;color:#fff;font-size:18px;}
     footer.support-footer a{color:#fff;text-decoration:underline;}
@@ -52,7 +53,7 @@
 <body>
   <div class="container">
     <div class="card">
-      <h1>Drone LogBook <span class="muted">v1.1.1</span></h1>
+      <h1>Drone LogBook <span class="muted">v1.1.2</span></h1>
 
       <div class="row">
         <button id="btn-google" class="google">Sign in with Google</button>
@@ -71,7 +72,6 @@
         </div>
       </div>
 
-      <!-- Endpoint is hidden/locked in app.js -->
       <input id="google-endpoint" type="hidden" />
 
       <div id="provider-google" style="margin-top:12px;">
@@ -84,23 +84,10 @@
               <span id="validate-status" class="pill muted">Not validated</span>
             </div>
             <div class="help">
-              • <b>Shared</b>: paste a Shared-Drive <i>folder</i> link (we’ll auto-create “Flight Log”) or a Sheet link.<br>
-              • <b>Personal</b>: no link needed — saves to <i>your</i> My Drive (tab “Flight Log”).<br>
+              • <b>Shared</b>: paste a Shared-Drive <i>folder</i> link (auto-creates “Flight Log”) or a Sheet link.<br>
+              • <b>Personal</b>: no link needed — saves to <i>your</i> My Drive (“Flight Log” tab).<br>
               • Use <b>Validate Link</b> to check permissions before syncing.
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div id="provider-microsoft" class="hidden" style="margin-top:12px;">
-        <div class="grid grid-2">
-          <div>
-            <label for="ms-driveitem">Drive Item ID (optional)</label>
-            <input id="ms-driveitem" type="text" placeholder="future use">
-          </div>
-          <div>
-            <label for="ms-table">Table Name</label>
-            <input id="ms-table" type="text" placeholder="FlightLogTable">
           </div>
         </div>
       </div>
@@ -114,7 +101,6 @@
       <div id="log-console" class="console">[Ready]</div>
     </div>
 
-    <!-- FLIGHT LOG CARD -->
     <div class="card" id="flight-card">
       <h2>Flight Log</h2>
 
@@ -143,10 +129,13 @@
       <div class="grid grid-3">
         <div><label for="start-wind">Start Wind (m/s)</label><input id="start-wind" type="number" step="0.1" placeholder="e.g., 3.2"></div>
         <div><label for="start-wind-dir">Start Wind Dir (°)</label><input id="start-wind-dir" type="number" step="1" placeholder="0–359"></div>
-        <div class="row"><span class="muted">Auto-fills on “Now → Start”</span></div>
+        <div class="wind-note">
+          Wind auto-fill works only when:<br>
+          • You have GPS coordinates entered<br>
+          • You are connected to the internet
+        </div>
       </div>
 
-      <!-- TIME + BUTTON ROW (right-aligned, no collision) -->
       <div class="grid grid-3 align-center">
         <div><label for="start-local">Start Time (local)</label><input id="start-local" type="datetime-local"></div>
         <div><label for="end-local">End Time (local)</label><input id="end-local" type="datetime-local"></div>
