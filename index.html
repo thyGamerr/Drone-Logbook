@@ -41,7 +41,10 @@
     .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:12px}
     .help{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
     .hidden{display:none;}
-    .btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;}
+    /* Button row alignment fix */
+    .btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;justify-content:flex-end;}
+    .align-center{align-items:center;}
+    /* Footer */
     footer.support-footer{max-width:960px;margin:32px auto 20px auto;padding:0 24px;color:#fff;font-size:18px;}
     footer.support-footer a{color:#fff;text-decoration:underline;}
   </style>
@@ -143,7 +146,8 @@
         <div class="row"><span class="muted">Auto-fills on “Now → Start”</span></div>
       </div>
 
-      <div class="grid grid-3">
+      <!-- TIME + BUTTON ROW (right-aligned, no collision) -->
+      <div class="grid grid-3 align-center">
         <div><label for="start-local">Start Time (local)</label><input id="start-local" type="datetime-local"></div>
         <div><label for="end-local">End Time (local)</label><input id="end-local" type="datetime-local"></div>
         <div class="btn-row">
