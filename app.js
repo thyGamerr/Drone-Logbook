@@ -3,7 +3,7 @@
    >>> SET YOUR GOOGLE WEB APP URL BELOW <<< */
 
 const FIXED_GOOGLE_ENDPOINT =
-  "https://script.google.com/macros/s/AKfycbwfot9kG0jXpc5YLOkNISPPZsXsoLA276_TEgShvbJdQHAD54oCMmbrJHEUo6jRM-e8/exec"; 
+  "https://script.google.com/macros/s/AKfycbxAX0hY--ygh-vImUrZ-bWqNy_0yxEDiI4e2-nx7ewGYx1uBJCFIlJR-YO4SokZD2U_/exec"; 
 
 // -----------------------------
 // Basic helpers
