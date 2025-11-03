@@ -11,10 +11,10 @@
   <!-- Google Identity Services SDK -->
   <script async defer src="https://accounts.google.com/gsi/client"></script>
 
-  <!-- [SCRIPT PATH] Your auth config (renamed from config.js to auth-config.js) -->
+  <!-- Configs -->
   <script defer src="./auth-config.js"></script>
 
-  <!-- Main app logic -->
+  <!-- Main app -->
   <script defer src="./app.js"></script>
 
   <style>
@@ -27,6 +27,9 @@
       --btn: #0078d7;
       --btn-google: #db4437;
       --border: #2b2f3a;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --err: #ef4444;
     }
     html, body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
     .container { max-width: 960px; margin: 0 auto; padding: 24px; }
@@ -36,53 +39,60 @@
       border-radius: 12px;
       padding: 18px 20px;
       box-shadow: 0 4px 24px rgba(0,0,0,.25);
+      margin-bottom: 18px;
     }
     h1 { margin: 0 0 10px; color: var(--accent); font-weight: 650; }
     h2 { margin: 18px 0 10px; font-size: 18px; }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 720px) { .grid-2 { grid-template-columns: 1fr 1fr; } .grid-3 { grid-template-columns: 1fr 1fr 1fr; } }
     button {
       appearance: none; border: 1px solid var(--border); color: var(--text);
-      background: var(--btn); padding: 10px 14px; border-radius: 8px; cursor: pointer;
-      font-weight: 600;
+      background: var(--btn); padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600;
     }
     button.google { background: var(--btn-google); border-color: #b13b31; }
     button.microsoft { background: var(--btn); }
     button:disabled { opacity: .6; cursor: not-allowed; }
-
     label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-    input, select {
+    input, select, textarea {
       width: 100%; background: #11141a; color: var(--text);
       border: 1px solid var(--border); border-radius: 8px; padding: 10px;
-      outline: none;
+      outline: none; resize: vertical;
     }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
-    @media (min-width: 720px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
-
-    .hidden { display: none; }
-
-    .console { background: #0f1116; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; min-height: 120px; }
+    textarea { min-height: 90px; }
     .muted { color: var(--muted); }
-    .spacer { height: 16px; }
+    .hidden { display: none; }
+    .console { background: #0f1116; border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; min-height: 120px; }
+    /* Toast */
+    #toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      background: #0f1116; border: 1px solid var(--border); color: var(--text);
+      padding: 10px 14px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .25s ease; z-index: 9999;
+    }
+    #toast.show { opacity: 1; }
+    #toast.ok { border-color: #183024; color: var(--ok); }
+    #toast.warn { border-color: #3a2f18; color: var(--warn); }
+    #toast.err { border-color: #3a1818; color: var(--err); }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- AUTH + SETTINGS -->
     <div class="card">
       <h1>Drone LogBook <span class="muted">v1.0.0</span></h1>
 
       <div class="row" style="margin-top: 8px;">
         <button id="btn-google" class="google">Sign in with Google</button>
         <button id="btn-microsoft" class="microsoft">Sign in with Microsoft</button>
-        <span id="signed-in-as" class="muted"></span>  <!-- [ID FIX] was user-info -->
+        <span id="signed-in-as" class="muted"></span>
       </div>
-
-      <div class="spacer"></div>
 
       <h2>Settings</h2>
       <div class="grid grid-2">
         <div>
           <label for="provider">Provider</label>
-          <!-- [VALUE FIX] values are lowercase to match app.js -->
           <select id="provider">
             <option value="google">Google</option>
             <option value="microsoft">Microsoft</option>
@@ -90,7 +100,6 @@
         </div>
       </div>
 
-      <!-- [ID FIX] provider-google -->
       <div id="provider-google" style="margin-top: 12px;">
         <div class="grid">
           <div>
@@ -100,7 +109,6 @@
         </div>
       </div>
 
-      <!-- [ADD SECTION] provider-microsoft, with IDs used by app.js -->
       <div id="provider-microsoft" class="hidden" style="margin-top: 12px;">
         <div class="grid grid-2">
           <div>
@@ -116,14 +124,83 @@
 
       <div class="row" style="margin-top: 14px;">
         <button id="btn-save-settings">Save settings</button>
+        <span class="muted">Queue: <span id="queue-count">0</span> items</span>
       </div>
 
-      <div class="spacer"></div>
-
       <h2>Console</h2>
-      <!-- [ID FIX] console -> log-console -->
       <div id="log-console" class="console">[Ready]</div>
     </div>
+
+    <!-- FLIGHT LOG CARD -->
+    <div class="card" id="flight-card">
+      <h2>Flight Log</h2>
+      <div class="grid grid-2">
+        <div>
+          <label for="flight-name">Flight Name</label>
+          <input id="flight-name" type="text" placeholder="Harbour Mapping Run 1">
+        </div>
+        <div>
+          <label for="project">Project</label>
+          <input id="project" type="text" placeholder="Sooke Harbour Eelgrass Survey">
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        <div>
+          <label for="start-local">Start Time (local)</label>
+          <input id="start-local" type="datetime-local">
+        </div>
+        <div>
+          <label for="end-local">End Time (local)</label>
+          <input id="end-local" type="datetime-local">
+        </div>
+        <div style="display:flex; gap:10px; align-items:end;">
+          <button id="btn-now-start" type="button">Now → Start</button>
+          <button id="btn-now-end" type="button">Now → End</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        <div>
+          <label for="takeoff-lat">Takeoff Lat</label>
+          <input id="takeoff-lat" type="text" placeholder="48.371299">
+        </div>
+        <div>
+          <label for="takeoff-lon">Takeoff Lon</label>
+          <input id="takeoff-lon" type="text" placeholder="-123.742839">
+        </div>
+        <div style="display:flex; gap:10px; align-items:end;">
+          <button id="btn-gps" type="button">Use GPS</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <label for="notes">Notes</label>
+          <textarea id="notes" placeholder="Optional notes"></textarea>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div>
+          <label for="drive-type">Drive Type</label>
+          <select id="drive-type">
+            <option value="personal" selected>Personal (My Drive)</option>
+            <option value="shared">Shared (Team Drive)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top: 10px;">
+        <button id="btn-queue-start" type="button">Queue Start</button>
+        <button id="btn-queue-end" type="button">Queue End</button>
+        <button id="btn-sync" type="button">Sync Now</button>
+        <button id="btn-clear-queue" type="button" style="background:#30343f;">Clear Queue (local)</button>
+      </div>
+    </div>
   </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
 </body>
 </html>
