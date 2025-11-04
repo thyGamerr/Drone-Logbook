@@ -1,5 +1,7 @@
 const FIXED_GOOGLE_ENDPOINT =
   "https://script.google.com/macros/s/AKfycbya-oZcrDpBX2bmXWTkkA2SJDiAqHvKK3qdARUGhMhVkpp8x3oTU55z8pCnal4CmvoN/exec";
+const GOOGLE_CLIENT_ID =
+  "314985765441-64a7gf2b9vvvesv6tc8ocngn24pej827.apps.googleusercontent.com";
 
 // -----------------------------
 // Helpers
@@ -29,32 +31,90 @@ function sv(id,v){ const el = $(`#${id}`); if (el) el.value = v||""; }
 
 function updateSignedInLabel(){
   const el = $("#signed-in-as");
-  if(!el) return;
-  if(signedInEmail){
+  const signout = $("#btn-signout");
+  const gbtn = $("#g_id_button");
+  if (signedInEmail) {
     el.textContent = `Signed in as ${signedInEmail}`;
     el.dataset.email = signedInEmail;
+    signout?.classList.remove("hidden");
+    gbtn?.classList.add("hidden");
   } else {
     el.textContent = "";
     el.dataset.email = "";
+    signout?.classList.add("hidden");
+    gbtn?.classList.remove("hidden");
   }
 }
 
-// Fallback sign-ins (always responsive)
-window.fakeGoogleSignIn = function(){
-  if (!signedInEmail) {
-    const v = prompt("Enter your email to sign in:");
-    if (!v) return;
-    signedInEmail = v.trim();
-    localStorage.setItem("dlb_email", signedInEmail);
+// -----------------------------
+// REAL Google Identity Services (OIDC)
+// -----------------------------
+function decodeJwt(token) {
+  // Basic (non-validating) decoder, just to read email from payload
+  const [, payload] = token.split(".");
+  const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+  return JSON.parse(decodeURIComponent(Array.prototype.map.call(json, c =>
+    `%${('00' + c.charCodeAt(0).toString(16)).slice(-2)}`
+  ).join("")));
+}
+
+function initGoogleSignIn(){
+  if (!window.google || !google.accounts || !google.accounts.id) {
+    log("Google Identity script not ready yet. Will retry.");
+    setTimeout(initGoogleSignIn, 500);
+    return;
   }
+
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: (resp) => {
+      try {
+        const payload = decodeJwt(resp.credential);
+        const email = payload.email || "";
+        if (email) {
+          signedInEmail = email;
+          localStorage.setItem("dlb_email", signedInEmail);
+          toast("Signed in with Google.");
+          log("Google sign-in OK (GIS).");
+          updateSignedInLabel();
+        } else {
+          toast("Sign-in failed: no email in token","err");
+          log("GIS token missing email claim.");
+        }
+      } catch (e) {
+        toast("Sign-in parse error","err");
+        log("GIS parse error: " + e.message);
+      }
+    },
+    ux_mode: "popup",
+    auto_select: true,
+    itp_support: true
+  });
+
+  // Render the Google button in our placeholder div
+  const host = $("#g_id_button");
+  if (host) {
+    google.accounts.id.renderButton(host, {
+      theme: "filled_blue",
+      size: "large",
+      shape: "pill",
+      type: "standard",
+      text: "signin_with"
+    });
+  }
+
+  // Optionally prompt One Tap (won't show if blocked/disabled)
+  google.accounts.id.prompt();
+}
+
+function signOut(){
+  try { google?.accounts?.id?.disableAutoSelect(); } catch {}
+  localStorage.removeItem("dlb_email");
+  signedInEmail = "";
   updateSignedInLabel();
-  toast("Google sign-in OK.");
-  log("Google sign-in OK (fallback).");
-};
-window.fakeMicrosoftSignIn = function(){
-  toast("Microsoft sign-in not enabled yet.", "warn");
-  log("Microsoft sign-in placeholder.");
-};
+  toast("Signed out.");
+  log("User signed out.");
+}
 
 // -----------------------------
 // Settings + queue
@@ -105,8 +165,7 @@ function qAdd(type){
     baseM: "",
     notes: gv("notes"),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
-    // used by backend to choose the destination sheet:
-    targetLink: gv("target-sheet-id") || ""
+    targetLink: gv("target-sheet-id") || ""   // backend chooses this sheet if provided
   };
   const arr = loadQ(); arr.push(item); saveQ(arr);
   toast(`Queued ${type} → ${item.flightName}`); log(`Queued ${type} → ${item.flightName}`);
@@ -170,11 +229,10 @@ async function syncNow(){
   const list = loadQ();
   if(!list.length){ toast("Nothing to sync.","warn"); return; }
   try{
-    // attach same targetLink to all items from current settings
     const targetLink = gv("target-sheet-id") || "";
     const payload = list.map(x=>({ ...x, targetLink }));
     await postNoCors(payload);
-    saveQ([]); // assume success (no-cors won't return body)
+    saveQ([]); // no-cors → assume success
     toast("Synced (sent)."); log("Synced (sent to Apps Script).");
   }catch(e){
     toast("Network error during sync.","err"); log(`Sync failed: ${e.message}`);
@@ -195,15 +253,17 @@ function bindUI(){
   $("#btn-now-end")?.addEventListener("click", nowEnd);
   $("#btn-gps")?.addEventListener("click", useGPS);
 
-  // Also bind inline fallbacks again (belt & suspenders)
-  $("#btn-google")?.addEventListener("click", window.fakeGoogleSignIn);
-  $("#btn-microsoft")?.addEventListener("click", window.fakeMicrosoftSignIn);
+  $("#btn-microsoft")?.addEventListener("click", ()=>{ toast("Microsoft sign-in not enabled yet.","warn"); log("Microsoft sign-in placeholder."); });
+  $("#btn-signout")?.addEventListener("click", signOut);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   bindUI();
   loadSettings();
   updateSignedInLabel();
+  // Initialize real Google sign-in (renders the button and handles login)
+  initGoogleSignIn();
+  // Finish boot
   updQ();
-  log("Drone LogBook v1.1.3 ready.");
+  log("Drone LogBook v1.2.0 ready.");
 });
