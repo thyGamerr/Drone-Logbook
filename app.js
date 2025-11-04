@@ -2,7 +2,7 @@
    Paste this over your existing app.js
    >>> SET YOUR GOOGLE WEB APP URL BELOW <<< */
 
-const FIXED_GOOGLE_ENDPOINT = "https://script.google.com/macros/s/AKfycbwvtiXYzZZbQDCL4MvL1IOL1bHecQWaDUGCo_zN5GHofwb_Z1PoJnOMxWPDxjWyXt4n/exec";
+const FIXED_GOOGLE_ENDPOINT = "https://script.google.com/macros/s/AKfycbya-oZcrDpBX2bmXWTkkA2SJDiAqHvKK3qdARUGhMhVkpp8x3oTU55z8pCnal4CmvoN/exec";
 const $ = (s) => document.querySelector(s);
 
 function nowLocalISO() {
