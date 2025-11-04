@@ -1,8 +1,5 @@
-/* app.js — Drone LogBook (robust buttons + no-preflight / no-cors sync)
-   >>> SET YOUR GOOGLE WEB APP URL BELOW <<< */
-
 const FIXED_GOOGLE_ENDPOINT =
-  "https://script.google.com/macros/s/PASTE_YOUR_EXEC_URL_HERE/exec"; // <-- REPLACE THIS
+  "https://script.google.com/macros/s/AKfycbya-oZcrDpBX2bmXWTkkA2SJDiAqHvKK3qdARUGhMhVkpp8x3oTU55z8pCnal4CmvoN/exec";
 
 // -----------------------------
 // Helpers
