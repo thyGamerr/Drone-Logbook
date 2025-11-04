@@ -1,5 +1,5 @@
 const FIXED_GOOGLE_ENDPOINT =
-  "https://script.google.com/macros/s/AKfycbya-oZcrDpBX2bmXWTkkA2SJDiAqHvKK3qdARUGhMhVkpp8x3oTU55z8pCnal4CmvoN/exec";
+  "https://script.google.com/macros/s/AKfycbypQst3AW88aybQfMSMXvax2RPR4E_-t_N6GmdJVfEMg5R8FdBeujsihxw8VSmEnRo3/exec";
 const GOOGLE_CLIENT_ID =
   "314985765441-64a7gf2b9vvvesv6tc8ocngn24pej827.apps.googleusercontent.com";
 
