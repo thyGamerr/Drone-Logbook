@@ -1,187 +1,215 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Drone LogBook</title>
-
-  <!-- SDKs -->
-  <script async defer src="https://accounts.google.com/gsi/client"></script>
-  <script defer src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
-
-  <!-- Configs -->
-  <script defer src="./auth-config.js"></script>
-  <script defer src="./app.js"></script>
-
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drone LogBook v1.1.3</title>
+  <link rel="manifest" href="manifest.json" />
   <style>
-    :root {
-      --bg:#121418;--panel:#181b22;--border:#2b2f3a;
-      --text:#fff;--muted:#9aa4af;--accent:#4fc3f7;
-      --ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--btn:#0078d7;--btn-google:#db4437;
-    }
-    html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;min-height:100%;}
-    .container{max-width:960px;margin:auto;padding:24px;}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 4px 24px rgba(0,0,0,.25);}
-    h1{margin:0 0 10px;color:var(--accent);} h2{margin:18px 0 10px;font-size:18px;}
-    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
-    input,select,textarea{width:100%;background:#11141a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;resize:vertical;}
-    textarea{min-height:90px;}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-    .grid{display:grid;gap:14px;}
-    @media(min-width:720px){.grid-2{grid-template-columns:1fr 1fr}.grid-3{grid-template-columns:1fr 1fr 1fr}}
-    button{border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer;color:var(--text);background:var(--btn);}
-    button.google{background:var(--btn-google);} button.microsoft{background:var(--btn);}
-    button:disabled{opacity:.6;cursor:not-allowed;}
-    .muted{color:var(--muted);}
-    .console{background:#0f1116;border:1px solid var(--border);border-radius:8px;padding:12px;min-height:120px;font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap;}
-    #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f1116;border:1px solid var(--border);
-      border-radius:10px;padding:10px 14px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999;}
-    #toast.show{opacity:1;}#toast.ok{color:var(--ok);}#toast.warn{color:var(--warn);}#toast.err{color:var(--err);}
-    .inline-actions{display:flex;gap:8px;align-items:center}
-    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:12px}
-    .help{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
-    .hidden{display:none;}
-    /* Button row alignment fix */
-    .btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;justify-content:flex-end;margin-right:20px;}
-    .align-center{align-items:center;}
-    .wind-note{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4;text-align:right;padding-right:20px;}
-    /* Footer */
-    footer.support-footer{max-width:960px;margin:32px auto 20px auto;padding:0 24px;color:#fff;font-size:18px;}
-    footer.support-footer a{color:#fff;text-decoration:underline;}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0f1216;color:#e7e7e7;margin:0}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+    h1{font-size:28px;margin:0 0 16px}
+    .card{background:#151a20;border:1px solid #202833;border-radius:12px;padding:16px;margin:16px 0}
+    label{display:block;margin:10px 0 6px;font-weight:600}
+    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #2a3340;background:#0f141a;color:#e7e7e7}
+    textarea{min-height:120px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    .btn{background:#1185ff;border:0;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
+    .btn.secondary{background:#2c3750}
+    .btn.warn{background:#ff9c07;color:#111}
+    .btn.danger{background:#e04d44}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .stack{display:flex;gap:12px;flex-wrap:wrap}
+    .right{justify-content:flex-end}
+    #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:-60px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 14px;transition:all .25s;z-index:999}
+    #toast.show{bottom:18px}
+    #toast.ok{border-color:#0ea5e9}
+    #toast.warn{border-color:#f59e0b}
+    #toast.err{border-color:#ef4444}
+    #log-console{height:220px;overflow:auto;white-space:pre;background:#0c0f13;border:1px solid #1f2a38;border-radius:10px;padding:10px}
+    small.muted{opacity:.7}
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="wrap">
+    <h1>Drone LogBook <span style="opacity:.6">v1.1.3</span></h1>
+
+    <!-- Sign-in -->
     <div class="card">
-      <h1>Drone LogBook <span class="muted">v1.1.2</span></h1>
-
-      <div class="row">
-        <button id="btn-google" class="google">Sign in with Google</button>
-        <button id="btn-microsoft" class="microsoft">Sign in with Microsoft</button>
-        <span id="signed-in-as" class="muted"></span>
+      <div class="stack">
+        <button id="btn-google" type="button" class="btn" onclick="window.fakeGoogleSignIn()">Sign in with Google</button>
+        <button id="btn-microsoft" type="button" class="btn secondary" onclick="window.fakeMicrosoftSignIn()">Sign in with Microsoft</button>
+        <span id="signed-in-as" data-email="" style="align-self:center"></span>
       </div>
+    </div>
 
-      <h2>Settings</h2>
-      <div class="grid grid-2">
+    <!-- Settings -->
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="row">
         <div>
           <label for="provider">Provider</label>
           <select id="provider">
-            <option value="google">Google</option>
-            <option value="microsoft">Microsoft</option>
+            <option value="google" selected>Google</option>
+            <option value="microsoft">Microsoft (coming soon)</option>
           </select>
         </div>
-      </div>
-
-      <input id="google-endpoint" type="hidden" />
-
-      <div id="provider-google" style="margin-top:12px;">
-        <div class="grid" style="margin-top:10px;">
-          <div>
-            <label for="target-sheet-id">Target Sheet or Folder URL (Shared OK)</label>
-            <div class="inline-actions">
-              <input id="target-sheet-id" type="text" placeholder="Paste a Shared Drive folder link OR a Google Sheet link" style="flex:1">
-              <button id="btn-validate-link" type="button">Validate Link</button>
-              <span id="validate-status" class="pill muted">Not validated</span>
-            </div>
-            <div class="help">
-              • <b>Shared</b>: paste a Shared-Drive <i>folder</i> link (auto-creates “Flight Log”) or a Sheet link.<br>
-              • <b>Personal</b>: no link needed — saves to <i>your</i> My Drive (“Flight Log” tab).<br>
-              • Use <b>Validate Link</b> to check permissions before syncing.
-            </div>
-          </div>
+        <div>
+          <label for="target-sheet-id">Target Sheet or Folder URL (Shared OK)</label>
+          <input id="target-sheet-id" placeholder="Paste a Google Sheet link (recommended). If blank, a Flight Log sheet is created in your Drive." />
         </div>
       </div>
-
-      <div class="row" style="margin-top:14px;">
-        <button id="btn-save-settings">Save settings</button>
-        <span class="muted">Queue: <span id="queue-count">0</span></span>
+      <div class="stack right" style="margin-top:12px">
+        <button id="btn-validate-link" class="btn secondary">Validate Link</button>
+        <button id="btn-save-settings" class="btn">Save settings</button>
+        <span id="validate-status" class="pill small"></span>
+        <span>Queue: <strong id="queue-count">0</strong></span>
       </div>
-
-      <h2>Console</h2>
-      <div id="log-console" class="console">[Ready]</div>
+      <div style="margin-top:8px">
+        <small class="muted">
+          <b>Shared:</b> paste a Google Sheet link that lives in your Shared Drive.<br />
+          <b>Personal:</b> leave blank to save to your own My Drive (auto creates a “Flight Log” sheet).<br />
+          <b>Wind note:</b> Wind auto-fills only when online and GPS coordinates are present.
+        </small>
+      </div>
     </div>
 
-    <div class="card" id="flight-card">
-      <h2>Flight Log</h2>
+    <!-- Flight Log -->
+    <div class="card">
+      <h3>Flight Log</h3>
 
-      <div class="grid grid-2">
-        <div><label for="flight-name">Flight Name</label><input id="flight-name" type="text" placeholder="Harbour Mapping Run 1"></div>
-        <div><label for="project">Project / Job</label><input id="project" type="text" placeholder="Sooke Harbour Eelgrass Survey"></div>
-      </div>
-
-      <div class="grid grid-2">
-        <div><label for="pilot-name">Pilot Name</label><input id="pilot-name" type="text" placeholder="Your name"></div>
-        <div><label for="observer">Observer / Ground Crew</label><input id="observer" type="text" placeholder="Optional"></div>
-      </div>
-
-      <div class="grid grid-3">
-        <div><label for="drone-model">Drone Model</label><input id="drone-model" type="text" placeholder="Matrice 350 RTK"></div>
-        <div><label for="aircraft-id">Aircraft ID / S/N</label><input id="aircraft-id" type="text" placeholder="ABC12345"></div>
-        <div><label for="payload">Payload</label><input id="payload" type="text" placeholder="Zenmuse P1 / H30T"></div>
-      </div>
-
-      <div class="grid grid-3">
-        <div><label for="mission-type">Mission Type</label><input id="mission-type" type="text" placeholder="Mapping / Inspection / Training"></div>
-        <div><label for="rtk-mode">RTK Mode</label><input id="rtk-mode" type="text" placeholder="Fixed / Float / None"></div>
-        <div><label for="airspace-method">Airspace Method</label><input id="airspace-method" type="text" placeholder="NAV Drone / NOTAM / ATC call"></div>
-      </div>
-
-      <div class="grid grid-3">
-        <div><label for="start-wind">Start Wind (m/s)</label><input id="start-wind" type="number" step="0.1" placeholder="e.g., 3.2"></div>
-        <div><label for="start-wind-dir">Start Wind Dir (°)</label><input id="start-wind-dir" type="number" step="1" placeholder="0–359"></div>
-        <div class="wind-note">
-          Wind auto-fill works only when:<br>
-          • You have GPS coordinates entered<br>
-          • You are connected to the internet
-        </div>
-      </div>
-
-      <div class="grid grid-3 align-center">
-        <div><label for="start-local">Start Time (local)</label><input id="start-local" type="datetime-local"></div>
-        <div><label for="end-local">End Time (local)</label><input id="end-local" type="datetime-local"></div>
-        <div class="btn-row">
-          <button id="btn-now-start">Now → Start</button>
-          <button id="btn-now-end">Now → End</button>
-          <button id="btn-gps">Use GPS</button>
-        </div>
-      </div>
-
-      <div class="grid grid-3">
-        <div><label for="takeoff-lat">Takeoff Lat</label><input id="takeoff-lat" type="text" placeholder="48.371299"></div>
-        <div><label for="takeoff-lon">Takeoff Lon</label><input id="takeoff-lon" type="text" placeholder="-123.742839"></div>
-        <div></div>
-      </div>
-
-      <div class="grid"><label for="notes">Notes</label><textarea id="notes" placeholder="Optional notes"></textarea></div>
-
-      <div class="grid grid-2">
+      <div class="row">
         <div>
-          <label for="drive-type">Drive Type</label>
-          <select id="drive-type">
-            <option value="personal" selected>Personal (My Drive)</option>
-            <option value="shared">Shared (Team Drive / Shared Folder)</option>
-          </select>
-          <div class="help" id="drive-help">
-            Personal → saves to <b>your</b> My Drive (no link needed).<br>
-            Shared → paste a Shared-Drive folder/Sheet link in Settings.
-          </div>
+          <label for="flight-name">Flight Name</label>
+          <input id="flight-name" placeholder="Harbour Mapping Run 1" />
+        </div>
+        <div>
+          <label for="project">Project / Job</label>
+          <input id="project" placeholder="Sooke Harbour Eelgrass Survey" />
         </div>
       </div>
 
-      <div class="row" style="margin-top:10px;">
-        <button id="btn-queue-start">Queue Start</button>
-        <button id="btn-queue-end">Queue End</button>
-        <button id="btn-sync">Sync Now</button>
-        <button id="btn-clear-queue" style="background:#30343f;">Clear Queue (local)</button>
+      <div class="row">
+        <div>
+          <label for="pilot-name">Pilot Name</label>
+          <input id="pilot-name" placeholder="Your name" />
+        </div>
+        <div>
+          <label for="observer">Observer / Ground Crew</label>
+          <input id="observer" placeholder="Optional" />
+        </div>
       </div>
+
+      <div class="row">
+        <div>
+          <label for="drone-model">Drone Model</label>
+          <input id="drone-model" placeholder="Matrice 350 RTK" />
+        </div>
+        <div>
+          <label for="aircraft-id">Aircraft ID / S/N</label>
+          <input id="aircraft-id" placeholder="ABC12345" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="payload">Payload</label>
+          <input id="payload" placeholder="Zenmuse P1 / H30T" />
+        </div>
+        <div>
+          <label for="mission-type">Mission Type</label>
+          <input id="mission-type" placeholder="Mapping / Inspection / Training" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="rtk-mode">RTK Mode</label>
+          <input id="rtk-mode" placeholder="Fixed / Float / None" />
+        </div>
+        <div>
+          <label for="airspace-method">Airspace Method</label>
+          <input id="airspace-method" placeholder="NAV Drone / NOTAM / ATC call" />
+        </div>
+      </div>
+
+      <div class="row3">
+        <div>
+          <label for="start-wind">Start Wind (m/s)</label>
+          <input id="start-wind" placeholder="e.g., 3.2" />
+        </div>
+        <div>
+          <label for="start-wind-dir">Start Wind Dir (°)</label>
+          <input id="start-wind-dir" placeholder="0–359" />
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <div class="stack">
+            <button id="btn-now-start" class="btn">Now → Start</button>
+            <button id="btn-now-end" class="btn">Now → End</button>
+            <button id="btn-gps" class="btn secondary">Use GPS</button>
+          </div>
+          <small class="muted">Auto-fills need online connection + GPS coordinates.</small>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="start-local">Start Time (local)</label>
+          <input id="start-local" type="datetime-local" />
+        </div>
+        <div>
+          <label for="end-local">End Time (local)</label>
+          <input id="end-local" type="datetime-local" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="takeoff-lat">Takeoff Lat</label>
+          <input id="takeoff-lat" placeholder="48.371299" />
+        </div>
+        <div>
+          <label for="takeoff-lon">Takeoff Lon</label>
+          <input id="takeoff-lon" placeholder="-123.742839" />
+        </div>
+      </div>
+
+      <div>
+        <label for="notes">Notes</label>
+        <textarea id="notes" placeholder="Optional notes"></textarea>
+      </div>
+
+      <div class="stack" style="margin-top:12px">
+        <button id="btn-queue-start" class="btn">Queue Start</button>
+        <button id="btn-queue-end" class="btn">Queue End</button>
+        <button id="btn-sync" class="btn">Sync Now</button>
+        <button id="btn-clear-queue" class="btn danger">Clear Queue (local)</button>
+      </div>
+    </div>
+
+    <!-- Console -->
+    <div class="card">
+      <h3>Console</h3>
+      <div id="log-console">[Ready] Drone LogBook v1.1.3 UI loaded.</div>
+    </div>
+
+    <!-- Support -->
+    <div class="card" style="text-align:center">
+      <div style="font-weight:700">For support please contact</div>
+      <div style="font-size:18px;margin-top:6px;color:#ffffff">marineliaison4@tsoukenation.com</div>
     </div>
   </div>
 
-  <footer class="support-footer">
-    For support please contact
-    <a class="support-link" href="mailto:marineliaison4@tsoukenation.com">marineliaison4@tsoukenation.com</a>
-  </footer>
-
   <div id="toast"></div>
+
+  <!-- Make sure app.js loads after DOM -->
+  <script src="app.js" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    }
+  </script>
 </body>
 </html>
