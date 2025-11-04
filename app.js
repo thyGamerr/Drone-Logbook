@@ -1,6 +1,4 @@
-/* app.js — Drone LogBook (no-preflight, no-CORS readback)
-   Paste this over your existing app.js
-   >>> SET YOUR GOOGLE WEB APP URL BELOW <<< */
+
 
 const FIXED_GOOGLE_ENDPOINT = "https://script.google.com/macros/s/AKfycbya-oZcrDpBX2bmXWTkkA2SJDiAqHvKK3qdARUGhMhVkpp8x3oTU55z8pCnal4CmvoN/exec";
 const $ = (s) => document.querySelector(s);
