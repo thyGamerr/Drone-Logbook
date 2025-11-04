@@ -3,8 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Drone LogBook v1.1.3</title>
+  <title>Drone LogBook v1.2.0</title>
   <link rel="manifest" href="manifest.json" />
+  <!-- Google Identity Services (real Google sign-in) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0f1216;color:#e7e7e7;margin:0}
     .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
@@ -29,18 +31,23 @@
     #toast.err{border-color:#ef4444}
     #log-console{height:220px;overflow:auto;white-space:pre;background:#0c0f13;border:1px solid #1f2a38;border-radius:10px;padding:10px}
     small.muted{opacity:.7}
+    .hidden{display:none !important}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Drone LogBook <span style="opacity:.6">v1.1.3</span></h1>
+    <h1>Drone LogBook <span style="opacity:.6">v1.2.0</span></h1>
 
     <!-- Sign-in -->
     <div class="card">
-      <div class="stack">
-        <button id="btn-google" type="button" class="btn" onclick="window.fakeGoogleSignIn()">Sign in with Google</button>
-        <button id="btn-microsoft" type="button" class="btn secondary" onclick="window.fakeMicrosoftSignIn()">Sign in with Microsoft</button>
-        <span id="signed-in-as" data-email="" style="align-self:center"></span>
+      <div class="stack" style="align-items:center">
+        <!-- Google button will render inside this div -->
+        <div id="g_id_button"></div>
+
+        <button id="btn-microsoft" type="button" class="btn secondary">Sign in with Microsoft</button>
+        <button id="btn-signout" type="button" class="btn danger hidden">Sign out</button>
+
+        <span id="signed-in-as" data-email="" style="margin-left:12px"></span>
       </div>
     </div>
 
@@ -192,7 +199,7 @@
     <!-- Console -->
     <div class="card">
       <h3>Console</h3>
-      <div id="log-console">[Ready] Drone LogBook v1.1.3 UI loaded.</div>
+      <div id="log-console">[Ready] Drone LogBook v1.2.0 UI loaded.</div>
     </div>
 
     <!-- Support -->
@@ -204,7 +211,7 @@
 
   <div id="toast"></div>
 
-  <!-- Make sure app.js loads after DOM -->
+  <!-- Load the app AFTER DOM -->
   <script src="app.js" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
