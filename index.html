@@ -2,221 +2,131 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <title>Drone Flight Logger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Drone LogBook v1.2.0</title>
-  <link rel="manifest" href="manifest.json" />
-  <!-- Google Identity Services (real Google sign-in) -->
+
+  <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0f1216;color:#e7e7e7;margin:0}
-    .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
-    h1{font-size:28px;margin:0 0 16px}
-    .card{background:#151a20;border:1px solid #202833;border-radius:12px;padding:16px;margin:16px 0}
-    label{display:block;margin:10px 0 6px;font-weight:600}
-    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #2a3340;background:#0f141a;color:#e7e7e7}
-    textarea{min-height:120px}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
-    .btn{background:#1185ff;border:0;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
-    .btn.secondary{background:#2c3750}
-    .btn.warn{background:#ff9c07;color:#111}
-    .btn.danger{background:#e04d44}
-    .btn:disabled{opacity:.5;cursor:not-allowed}
-    .stack{display:flex;gap:12px;flex-wrap:wrap}
-    .right{justify-content:flex-end}
-    #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:-60px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 14px;transition:all .25s;z-index:999}
-    #toast.show{bottom:18px}
-    #toast.ok{border-color:#0ea5e9}
-    #toast.warn{border-color:#f59e0b}
-    #toast.err{border-color:#ef4444}
-    #log-console{height:220px;overflow:auto;white-space:pre;background:#0c0f13;border:1px solid #1f2a38;border-radius:10px;padding:10px}
-    small.muted{opacity:.7}
-    .hidden{display:none !important}
+    :root {
+      --bg:#0b1220; --card:#121a2c; --border:#1f2a44; --ink:#e6ecff; --sub:#9fb3ff; --field:#0e1526; --fieldb:#2a3760; --btn:#2a62ff; --btn2:#213357;
+    }
+    * { box-sizing:border-box; }
+    body { font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--ink); margin:0; }
+    .wrap { max-width: 960px; margin: 32px auto; padding: 16px; }
+    h1 { margin: 0 0 16px; font-size: 22px; }
+    .meta { color: var(--sub); font-size: 13px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin:12px 0; }
+    label { display:block; font-size:13px; color:#c9d4ff; margin:8px 0 4px; }
+    input, select, textarea { width:100%; padding:10px; border-radius:10px; border:1px solid var(--fieldb); background:var(--field); color:var(--ink); }
+    textarea { min-height: 80px; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    button { padding:10px 14px; border-radius:10px; background:var(--btn); color:#fff; border:none; cursor:pointer; }
+    button.secondary { background:var(--btn2); }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    #toast { position:fixed; bottom:16px; right:16px; background:var(--card); border:1px solid var(--border); padding:10px 12px; border-radius:10px; opacity:0; transition:opacity .2s; }
+    #toast.show { opacity:1; }
+    code { background:var(--field); padding:2px 6px; border-radius:6px; border:1px solid var(--fieldb); }
+    .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Drone LogBook <span style="opacity:.6">v1.2.0</span></h1>
+    <h1>Drone Flight Logger
+      <span class="meta">Queue: <strong id="queueCount">0</strong></span>
+    </h1>
 
-    <!-- Sign-in -->
+    <!-- Sign in card -->
     <div class="card">
-      <div class="stack" style="align-items:center">
-        <!-- Google button will render inside this div -->
-        <div id="g_id_button"></div>
-
-        <button id="btn-microsoft" type="button" class="btn secondary">Sign in with Microsoft</button>
-        <button id="btn-signout" type="button" class="btn danger hidden">Sign out</button>
-
-        <span id="signed-in-as" data-email="" style="margin-left:12px"></span>
+      <div class="row">
+        <div id="g_id_onload"
+             data-client_id="314985765441-64a7gf2b9vvvesv6tc8ocngn24pej827.apps.googleusercontent.com"
+             data-callback="handleCredentialResponse">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-shape="rectangular"
+             data-theme="outline"
+             data-text="signin_with"
+             data-size="large"
+             data-logo_alignment="left">
+        </div>
+        <div class="meta" id="signedInAs">Not signed in</div>
       </div>
     </div>
 
-    <!-- Settings -->
+    <!-- Flight form -->
     <div class="card">
-      <h3>Settings</h3>
-      <div class="row">
+      <div class="grid2">
         <div>
-          <label for="provider">Provider</label>
-          <select id="provider">
-            <option value="google" selected>Google</option>
-            <option value="microsoft">Microsoft (coming soon)</option>
+          <label>Flight Name</label>
+          <input id="flightName" placeholder="e.g., Sooke Survey 01">
+        </div>
+        <div>
+          <label>Project</label>
+          <input id="project" placeholder="e.g., Eelgrass 2025">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <label>Start Time (ISO)</label>
+          <input id="startTime" placeholder="auto or manual">
+        </div>
+        <div>
+          <label>End Time (ISO)</label>
+          <input id="endTime" placeholder="auto or manual">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <label>Latitude</label>
+          <input id="lat" inputmode="decimal" placeholder="48.*****">
+        </div>
+        <div>
+          <label>Longitude</label>
+          <input id="lon" inputmode="decimal" placeholder="-123.*****">
+        </div>
+      </div>
+
+      <label>Notes</label>
+      <textarea id="notes" placeholder="Optional notes"></textarea>
+
+      <div class="grid2">
+        <div>
+          <label>Drive Type</label>
+          <select id="driveType">
+            <option value="shared" selected>Shared Drive</option>
+            <option value="personal">My Drive</option>
           </select>
         </div>
         <div>
-          <label for="target-sheet-id">Target Sheet or Folder URL (Shared OK)</label>
-          <input id="target-sheet-id" placeholder="Paste a Google Sheet link (recommended). If blank, a Flight Log sheet is created in your Drive." />
+          <label>Client Email (fills after sign-in)</label>
+          <input id="clientEmail" placeholder="" readonly>
         </div>
       </div>
-      <div class="stack right" style="margin-top:12px">
-        <button id="btn-validate-link" class="btn secondary">Validate Link</button>
-        <button id="btn-save-settings" class="btn">Save settings</button>
-        <span id="validate-status" class="pill small"></span>
-        <span>Queue: <strong id="queue-count">0</strong></span>
-      </div>
-      <div style="margin-top:8px">
-        <small class="muted">
-          <b>Shared:</b> paste a Google Sheet link that lives in your Shared Drive.<br />
-          <b>Personal:</b> leave blank to save to your own My Drive (auto creates a “Flight Log” sheet).<br />
-          <b>Wind note:</b> Wind auto-fills only when online and GPS coordinates are present.
-        </small>
+
+      <div class="btns">
+        <button id="btnStart">Set Start (now)</button>
+        <button id="btnEnd">Set End (now)</button>
+        <button class="secondary" id="btnQueue">Queue</button>
+        <button id="btnSync">Sync</button>
+        <button class="secondary" id="btnClearQueue">Clear Queue</button>
+        <button class="secondary" id="sendTest">Send Test Row</button>
       </div>
     </div>
 
-    <!-- Flight Log -->
     <div class="card">
-      <h3>Flight Log</h3>
-
-      <div class="row">
-        <div>
-          <label for="flight-name">Flight Name</label>
-          <input id="flight-name" placeholder="Harbour Mapping Run 1" />
-        </div>
-        <div>
-          <label for="project">Project / Job</label>
-          <input id="project" placeholder="Sooke Harbour Eelgrass Survey" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="pilot-name">Pilot Name</label>
-          <input id="pilot-name" placeholder="Your name" />
-        </div>
-        <div>
-          <label for="observer">Observer / Ground Crew</label>
-          <input id="observer" placeholder="Optional" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="drone-model">Drone Model</label>
-          <input id="drone-model" placeholder="Matrice 350 RTK" />
-        </div>
-        <div>
-          <label for="aircraft-id">Aircraft ID / S/N</label>
-          <input id="aircraft-id" placeholder="ABC12345" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="payload">Payload</label>
-          <input id="payload" placeholder="Zenmuse P1 / H30T" />
-        </div>
-        <div>
-          <label for="mission-type">Mission Type</label>
-          <input id="mission-type" placeholder="Mapping / Inspection / Training" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="rtk-mode">RTK Mode</label>
-          <input id="rtk-mode" placeholder="Fixed / Float / None" />
-        </div>
-        <div>
-          <label for="airspace-method">Airspace Method</label>
-          <input id="airspace-method" placeholder="NAV Drone / NOTAM / ATC call" />
-        </div>
-      </div>
-
-      <div class="row3">
-        <div>
-          <label for="start-wind">Start Wind (m/s)</label>
-          <input id="start-wind" placeholder="e.g., 3.2" />
-        </div>
-        <div>
-          <label for="start-wind-dir">Start Wind Dir (°)</label>
-          <input id="start-wind-dir" placeholder="0–359" />
-        </div>
-        <div>
-          <label>&nbsp;</label>
-          <div class="stack">
-            <button id="btn-now-start" class="btn">Now → Start</button>
-            <button id="btn-now-end" class="btn">Now → End</button>
-            <button id="btn-gps" class="btn secondary">Use GPS</button>
-          </div>
-          <small class="muted">Auto-fills need online connection + GPS coordinates.</small>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="start-local">Start Time (local)</label>
-          <input id="start-local" type="datetime-local" />
-        </div>
-        <div>
-          <label for="end-local">End Time (local)</label>
-          <input id="end-local" type="datetime-local" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="takeoff-lat">Takeoff Lat</label>
-          <input id="takeoff-lat" placeholder="48.371299" />
-        </div>
-        <div>
-          <label for="takeoff-lon">Takeoff Lon</label>
-          <input id="takeoff-lon" placeholder="-123.742839" />
-        </div>
-      </div>
-
-      <div>
-        <label for="notes">Notes</label>
-        <textarea id="notes" placeholder="Optional notes"></textarea>
-      </div>
-
-      <div class="stack" style="margin-top:12px">
-        <button id="btn-queue-start" class="btn">Queue Start</button>
-        <button id="btn-queue-end" class="btn">Queue End</button>
-        <button id="btn-sync" class="btn">Sync Now</button>
-        <button id="btn-clear-queue" class="btn danger">Clear Queue (local)</button>
-      </div>
-    </div>
-
-    <!-- Console -->
-    <div class="card">
-      <h3>Console</h3>
-      <div id="log-console">[Ready] Drone LogBook v1.2.0 UI loaded.</div>
-    </div>
-
-    <!-- Support -->
-    <div class="card" style="text-align:center">
-      <div style="font-weight:700">For support please contact</div>
-      <div style="font-size:18px;margin-top:6px;color:#ffffff">marineliaison4@tsoukenation.com</div>
+      <div class="meta">Backend URL: <code id="urlEcho"></code></div>
     </div>
   </div>
 
   <div id="toast"></div>
 
-  <!-- Load the app AFTER DOM -->
+  <!-- App logic -->
   <script src="app.js" defer></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
-    }
-  </script>
 </body>
 </html>
