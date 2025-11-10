@@ -1,5 +1,5 @@
 /***** CONFIG *****/
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwwnJxswr21JUVoa_jy0U45CVqM6pMD_zpaJf1bETmelRxqT_VEKDOxVkxN35lxRdxC/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwi_bObfKiTY-8ZDxn1ogJKBDmk3SsD2imHdie3nC4VEbiMIxqII5EWLnD_cb9l3onO/exec';
 const LS_KEY = 'flightQueue_v3';
 
 /***** DOM + UX HELPERS *****/
@@ -10,14 +10,7 @@ function setValue(id, v){ const el = $(`#${id}`); if (el) el.value = v; }
 function getValue(id){ const el = $(`#${id}`); return el ? el.value : ''; }
 function setText(id, v){ const el = $(`#${id}`); if (el) el.textContent = v; }
 function on(id, ev, fn){ const el = $(`#${id}`); if (el) el.addEventListener(ev, fn); }
-
-function toast(msg){
-  const t = $('#toast');
-  if (!t) return alert(msg);
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 1800);
-}
+function toast(msg){ const t=$('#toast'); if(!t) return alert(msg); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
 
 /***** QUEUE *****/
 function readQueue(){ try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } }
@@ -33,11 +26,37 @@ window.handleCredentialResponse = (response) => {
     window.currentUserEmail = payload.email || '';
     setValue('clientEmail', window.currentUserEmail);
     setText('signedInAs', window.currentUserEmail ? `Signed in as: ${window.currentUserEmail}` : 'Not signed in');
+    $('#signOutBtn').style.display = window.currentUserEmail ? 'inline-block' : 'none';
     toast(window.currentUserEmail ? `Signed in: ${window.currentUserEmail}` : 'Sign-in failed');
-  } catch {
-    toast('Sign-in parse error');
-  }
+  } catch { toast('Sign-in parse error'); }
 };
+function signOut(){
+  window.currentUserEmail = '';
+  setValue('clientEmail','');
+  setText('signedInAs','Not signed in');
+  $('#signOutBtn').style.display = 'none';
+  toast('Signed out locally');
+}
+
+/***** LOAD SHARED DRIVES *****/
+async function loadSharedDrives(){
+  setValue('urlEcho', WEB_APP_URL);
+  const sel = $('#sharedDriveSelect');
+  if (!sel) return;
+
+  sel.innerHTML = '<option value="">Loading…</option>';
+  try {
+    const resp = await fetch(`${WEB_APP_URL}?action=listDrives`, { method:'GET' });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to list drives');
+    const drives = data.drives || [];
+    if (!drives.length) { sel.innerHTML = '<option value="">No Shared Drives found</option>'; return; }
+    sel.innerHTML = drives.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+  } catch (e) {
+    console.error(e);
+    sel.innerHTML = '<option value="">Error loading drives</option>';
+  }
+}
 
 /***** FORM *****/
 function collectForm(){
@@ -50,7 +69,8 @@ function collectForm(){
     lon: getValue('lon') ? safeNum(getValue('lon')) : '',
     notes: getValue('notes').trim(),
     driveType: (getValue('driveType') || 'shared').toLowerCase(),
-    clientEmail: (getValue('clientEmail') || window.currentUserEmail || '').trim()
+    clientEmail: (getValue('clientEmail') || window.currentUserEmail || '').trim(),
+    targetDriveId: getValue('sharedDriveSelect') || '' // used when driveType === 'shared'
   };
 }
 
@@ -65,53 +85,46 @@ async function postFlightLog(log){
     lon: typeof log.lon === 'number' ? log.lon : '',
     notes: log.notes || '',
     driveType: (log.driveType || 'shared').toLowerCase(),
-    clientEmail: log.clientEmail || ''
+    clientEmail: log.clientEmail || '',
+    targetDriveId: (log.driveType || 'shared').toLowerCase() === 'shared' ? (log.targetDriveId || '') : ''
   };
 
-  try {
-    const resp = await fetch(WEB_APP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
-    });
+  const resp = await fetch(WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify(payload)
+  });
 
-    try {
-      const data = await resp.json();
-      if (data && data.ok) return { ok:true, data };
-      return { ok:false, error: data?.error || `HTTP ${resp.status}` };
-    } catch {
-      return resp.ok ? { ok:true, data:null } : { ok:false, error:`HTTP ${resp.status}` };
-    }
-  } catch (e) {
-    return { ok:false, error:String(e) };
+  try {
+    const data = await resp.json();
+    if (data && data.ok) return { ok:true, data };
+    return { ok:false, error:data?.error || `HTTP ${resp.status}` };
+  } catch {
+    return resp.ok ? { ok:true, data:null } : { ok:false, error:`HTTP ${resp.status}` };
   }
 }
 
 /***** ACTIONS *****/
 function setStartNow(){ setValue('startTime', nowIso()); toast('Start set'); }
 function setEndNow(){ setValue('endTime', nowIso()); toast('End set'); }
-
 function queueCurrentForm(){
   const entry = collectForm();
   if (!entry.flightName) return toast('Flight Name required');
-  const q = readQueue(); q.push(entry); writeQueue(q);
-  toast('Added to queue');
+  if (entry.driveType === 'shared' && !entry.targetDriveId) return toast('Pick a Shared Drive');
+  const q = readQueue(); q.push(entry); writeQueue(q); toast('Added to queue');
 }
-
 async function syncQueue(){
   const btn = $('#btnSync'); if (btn) btn.disabled = true;
-  const q = readQueue(); if (!q.length){ toast('Queue empty'); if (btn) btn.disabled = false; return; }
-
+  const q = readQueue(); if (!q.length){ toast('Queue empty'); if (btn) btn.disabled=false; return; }
   for (let i=0;i<q.length;i++){
     const r = await postFlightLog(q[i]);
     if (!r.ok){ console.error('Sync error at item', i, r); toast('Sync failed — check Apps Script Executions'); if (btn) btn.disabled=false; return; }
   }
   writeQueue([]); toast('Synced successfully'); if (btn) btn.disabled=false;
 }
-
 function clearQueue(){ if (confirm('Clear local queue?')){ writeQueue([]); toast('Queue cleared'); } }
-
 async function sendTest(){
+  const driveType = (getValue('driveType') || 'shared').toLowerCase();
   const test = {
     flightName:'Test Flight 001',
     project:'Demo',
@@ -119,17 +132,20 @@ async function sendTest(){
     endTime: new Date(Date.now()+600000).toISOString(),
     lat: 48.3701, lon: -123.7356,
     notes:'Hello from client',
-    driveType: (getValue('driveType') || 'shared').toLowerCase(),
-    clientEmail: (window.currentUserEmail || '')
+    driveType,
+    clientEmail: (window.currentUserEmail || ''),
+    targetDriveId: driveType === 'shared' ? (getValue('sharedDriveSelect') || '') : ''
   };
+  if (driveType === 'shared' && !test.targetDriveId) return toast('Pick a Shared Drive first');
   const r = await postFlightLog(test);
   toast(r.ok ? '✅ Test row appended' : '❌ Test failed');
 }
 
 /***** INIT *****/
 function init(){
-  setText('urlEcho', WEB_APP_URL);
+  setValue('urlEcho', WEB_APP_URL);
   writeQueue(readQueue());
+  loadSharedDrives();
 
   on('btnStart','click', setStartNow);
   on('btnEnd','click', setEndNow);
@@ -137,10 +153,12 @@ function init(){
   on('btnSync','click', syncQueue);
   on('btnClearQueue','click', clearQueue);
   on('sendTest','click', sendTest);
+  on('signOutBtn','click', signOut);
+
+  $('#driveType').addEventListener('change', ()=>{
+    const shared = $('#driveType').value === 'shared';
+    $('#sharedDriveSelect').disabled = !shared;
+  });
 }
 
-if (document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
-}
+if (document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
