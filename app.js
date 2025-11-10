@@ -1,5 +1,5 @@
 /***** CONFIG *****/
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbypQst3AW88aybQfMSMXvax2RPR4E_-t_N6GmdJVfEMg5R8FdBeujsihxw8VSmEnRo3/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwwnJxswr21JUVoa_jy0U45CVqM6pMD_zpaJf1bETmelRxqT_VEKDOxVkxN35lxRdxC/exec';
 const LS_KEY = 'flightQueue_v3';
 
 /***** DOM + UX HELPERS *****/
