@@ -4,14 +4,12 @@
   <meta charset="utf-8" />
   <title>Drone Flight Logger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     :root { --bg:#0b1220; --card:#121a2c; --border:#1f2a44; --ink:#e6ecff; --sub:#9fb3ff; --field:#0e1526; --fieldb:#2a3760; --btn:#2a62ff; --btn2:#213357; }
     * { box-sizing:border-box; } body { font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--ink); margin:0; }
     .wrap { max-width:960px; margin:32px auto; padding:16px; }
-    h1 { margin:0 0 16px; font-size:22px; }
-    .meta { color:var(--sub); font-size:13px; }
+    h1 { margin:0 0 16px; font-size:22px; } .meta { color:var(--sub); font-size:13px; }
     .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin:12px 0; }
     label { display:block; font-size:13px; color:#c9d4ff; margin:8px 0 4px; }
     input, select, textarea { width:100%; padding:10px; border-radius:10px; border:1px solid var(--fieldb); background:var(--field); color:var(--ink); }
@@ -19,12 +17,9 @@
     .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
     button { padding:10px 14px; border-radius:10px; background:var(--btn); color:#fff; border:none; cursor:pointer; }
-    button.secondary { background:var(--btn2); }
-    button:disabled { opacity:.6; cursor:not-allowed; }
+    button.secondary { background:var(--btn2); } button:disabled { opacity:.6; cursor:not-allowed; }
     #toast { position:fixed; bottom:16px; right:16px; background:var(--card); border:1px solid var(--border); padding:10px 12px; border-radius:10px; opacity:0; transition:opacity .2s; }
     #toast.show { opacity:1; }
-    code { background:var(--field); padding:2px 6px; border-radius:6px; border:1px solid var(--fieldb); }
-    .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   </style>
 </head>
 <body>
@@ -33,13 +28,12 @@
 
     <!-- Sign-in -->
     <div class="card">
-      <div class="row">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <div id="g_id_onload"
              data-client_id="314985765441-64a7gf2b9vvvesv6tc8ocngn24pej827.apps.googleusercontent.com"
              data-callback="handleCredentialResponse"></div>
-        <div class="g_id_signin"
-             data-type="standard" data-shape="rectangular" data-theme="outline"
-             data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+        <div class="g_id_signin" data-type="standard" data-shape="rectangular"
+             data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
         <div class="meta" id="signedInAs">Not signed in</div>
         <button id="signOutBtn" class="secondary" style="display:none;">Sign Out</button>
       </div>
@@ -48,36 +42,18 @@
     <!-- Flight form -->
     <div class="card">
       <div class="grid2">
-        <div>
-          <label>Flight Name</label>
-          <input id="flightName" placeholder="e.g., Sooke Survey 01">
-        </div>
-        <div>
-          <label>Project</label>
-          <input id="project" placeholder="e.g., Eelgrass 2025">
-        </div>
+        <div><label>Flight Name</label><input id="flightName" placeholder="e.g., Sooke Survey 01"></div>
+        <div><label>Project</label><input id="project" placeholder="e.g., Eelgrass 2025"></div>
       </div>
 
       <div class="grid2">
-        <div>
-          <label>Start Time (ISO)</label>
-          <input id="startTime" placeholder="auto or manual">
-        </div>
-        <div>
-          <label>End Time (ISO)</label>
-          <input id="endTime" placeholder="auto or manual">
-        </div>
+        <div><label>Start Time (ISO)</label><input id="startTime" placeholder="auto or manual"></div>
+        <div><label>End Time (ISO)</label><input id="endTime" placeholder="auto or manual"></div>
       </div>
 
       <div class="grid2">
-        <div>
-          <label>Latitude</label>
-          <input id="lat" inputmode="decimal" placeholder="48.*****">
-        </div>
-        <div>
-          <label>Longitude</label>
-          <input id="lon" inputmode="decimal" placeholder="-123.*****">
-        </div>
+        <div><label>Latitude</label><input id="lat" inputmode="decimal" placeholder="48.*****"></div>
+        <div><label>Longitude</label><input id="lon" inputmode="decimal" placeholder="-123.*****"></div>
       </div>
 
       <label>Notes</label>
@@ -92,22 +68,14 @@
           </select>
         </div>
         <div>
-          <label>Shared Drive (choose for “Shared Drive”)</label>
-          <select id="sharedDriveSelect">
-            <option value="">Loading…</option>
-          </select>
+          <label>Shared Drive/Folder URL or ID (only when “Shared Drive”)</label>
+          <input id="sharedDriveUrl" placeholder="Paste a Shared Drive or folder URL (or just the ID)">
         </div>
       </div>
 
       <div class="grid2">
-        <div>
-          <label>Client Email</label>
-          <input id="clientEmail" placeholder="" readonly>
-        </div>
-        <div>
-          <label>Backend URL</label>
-          <input id="urlEcho" readonly>
-        </div>
+        <div><label>Client Email</label><input id="clientEmail" placeholder="" readonly></div>
+        <div><label>Backend URL</label><input id="urlEcho" readonly></div>
       </div>
 
       <div class="btns">
@@ -122,7 +90,6 @@
   </div>
 
   <div id="toast"></div>
-
   <script src="app.js" defer></script>
 </body>
 </html>
