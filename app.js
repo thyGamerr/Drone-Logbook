@@ -1,5 +1,5 @@
 /***** CONFIG *****/
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwi_bObfKiTY-8ZDxn1ogJKBDmk3SsD2imHdie3nC4VEbiMIxqII5EWLnD_cb9l3onO/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxb-NWE2e0T1mQZGnN1bvJAmvmcHVxbSv2-K_c9GdEgrxTkvb5K3_wZmDhv6SJP_mWC/exec';
 const LS_KEY = 'flightQueue_v3';
 
 /***** DOM + UX HELPERS *****/
@@ -16,7 +16,7 @@ function toast(msg){ const t=$('#toast'); if(!t) return alert(msg); t.textConten
 function readQueue(){ try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } }
 function writeQueue(a){ localStorage.setItem(LS_KEY, JSON.stringify(a || [])); setText('queueCount', String((a || []).length)); }
 
-/***** GOOGLE SIGN-IN (GIS) *****/
+/***** GOOGLE SIGN-IN *****/
 window.currentUserEmail = '';
 window.handleCredentialResponse = (response) => {
   try {
@@ -38,24 +38,19 @@ function signOut(){
   toast('Signed out locally');
 }
 
-/***** LOAD SHARED DRIVES *****/
-async function loadSharedDrives(){
-  setValue('urlEcho', WEB_APP_URL);
-  const sel = $('#sharedDriveSelect');
-  if (!sel) return;
-
-  sel.innerHTML = '<option value="">Loading…</option>';
-  try {
-    const resp = await fetch(`${WEB_APP_URL}?action=listDrives`, { method:'GET' });
-    const data = await resp.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to list drives');
-    const drives = data.drives || [];
-    if (!drives.length) { sel.innerHTML = '<option value="">No Shared Drives found</option>'; return; }
-    sel.innerHTML = drives.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-  } catch (e) {
-    console.error(e);
-    sel.innerHTML = '<option value="">Error loading drives</option>';
-  }
+/***** SHARED DRIVE URL → ID *****/
+function extractIdFromUrlOrId(input) {
+  if (!input) return '';
+  const trimmed = input.trim();
+  // If they pasted a raw ID, return it
+  if (/^[A-Za-z0-9_-]{20,}$/.test(trimmed)) return trimmed;
+  // Common Drive URL patterns
+  const m = trimmed.match(/\/folders\/([A-Za-z0-9_-]{20,})/);
+  if (m) return m[1];
+  // Also accept ?id=... style
+  const m2 = trimmed.match(/[?&]id=([A-Za-z0-9_-]{20,})/);
+  if (m2) return m2[1];
+  return '';
 }
 
 /***** FORM *****/
@@ -70,7 +65,7 @@ function collectForm(){
     notes: getValue('notes').trim(),
     driveType: (getValue('driveType') || 'shared').toLowerCase(),
     clientEmail: (getValue('clientEmail') || window.currentUserEmail || '').trim(),
-    targetDriveId: getValue('sharedDriveSelect') || '' // used when driveType === 'shared'
+    targetDriveId: extractIdFromUrlOrId(getValue('sharedDriveUrl'))
   };
 }
 
@@ -110,7 +105,7 @@ function setEndNow(){ setValue('endTime', nowIso()); toast('End set'); }
 function queueCurrentForm(){
   const entry = collectForm();
   if (!entry.flightName) return toast('Flight Name required');
-  if (entry.driveType === 'shared' && !entry.targetDriveId) return toast('Pick a Shared Drive');
+  if (entry.driveType === 'shared' && !entry.targetDriveId) return toast('Paste a Shared Drive/Folder URL or ID');
   const q = readQueue(); q.push(entry); writeQueue(q); toast('Added to queue');
 }
 async function syncQueue(){
@@ -134,9 +129,9 @@ async function sendTest(){
     notes:'Hello from client',
     driveType,
     clientEmail: (window.currentUserEmail || ''),
-    targetDriveId: driveType === 'shared' ? (getValue('sharedDriveSelect') || '') : ''
+    targetDriveId: driveType === 'shared' ? extractIdFromUrlOrId(getValue('sharedDriveUrl')) : ''
   };
-  if (driveType === 'shared' && !test.targetDriveId) return toast('Pick a Shared Drive first');
+  if (driveType === 'shared' && !test.targetDriveId) return toast('Paste a Shared Drive/Folder URL or ID first');
   const r = await postFlightLog(test);
   toast(r.ok ? '✅ Test row appended' : '❌ Test failed');
 }
@@ -145,7 +140,6 @@ async function sendTest(){
 function init(){
   setValue('urlEcho', WEB_APP_URL);
   writeQueue(readQueue());
-  loadSharedDrives();
 
   on('btnStart','click', setStartNow);
   on('btnEnd','click', setEndNow);
@@ -157,7 +151,7 @@ function init(){
 
   $('#driveType').addEventListener('change', ()=>{
     const shared = $('#driveType').value === 'shared';
-    $('#sharedDriveSelect').disabled = !shared;
+    $('#sharedDriveUrl').disabled = !shared;
   });
 }
 
