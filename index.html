@@ -4,23 +4,18 @@
   <meta charset="utf-8" />
   <title>Drone Flight Logger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-
   <style>
-    :root {
-      --bg:#0b1220; --card:#121a2c; --border:#1f2a44; --ink:#e6ecff; --sub:#9fb3ff; --field:#0e1526; --fieldb:#2a3760; --btn:#2a62ff; --btn2:#213357;
-    }
-    * { box-sizing:border-box; }
-    body { font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--ink); margin:0; }
-    .wrap { max-width: 960px; margin: 32px auto; padding: 16px; }
-    h1 { margin: 0 0 16px; font-size: 22px; }
-    .meta { color: var(--sub); font-size: 13px; }
+    :root { --bg:#0b1220; --card:#121a2c; --border:#1f2a44; --ink:#e6ecff; --sub:#9fb3ff; --field:#0e1526; --fieldb:#2a3760; --btn:#2a62ff; --btn2:#213357; }
+    * { box-sizing:border-box; } body { font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--ink); margin:0; }
+    .wrap { max-width:960px; margin:32px auto; padding:16px; }
+    h1 { margin:0 0 16px; font-size:22px; }
+    .meta { color:var(--sub); font-size:13px; }
     .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin:12px 0; }
     label { display:block; font-size:13px; color:#c9d4ff; margin:8px 0 4px; }
     input, select, textarea { width:100%; padding:10px; border-radius:10px; border:1px solid var(--fieldb); background:var(--field); color:var(--ink); }
-    textarea { min-height: 80px; }
+    textarea { min-height:80px; }
     .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
     button { padding:10px 14px; border-radius:10px; background:var(--btn); color:#fff; border:none; cursor:pointer; }
@@ -34,26 +29,19 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Drone Flight Logger
-      <span class="meta">Queue: <strong id="queueCount">0</strong></span>
-    </h1>
+    <h1>Drone Flight Logger <span class="meta">Queue: <strong id="queueCount">0</strong></span></h1>
 
-    <!-- Sign in card -->
+    <!-- Sign-in -->
     <div class="card">
       <div class="row">
         <div id="g_id_onload"
              data-client_id="314985765441-64a7gf2b9vvvesv6tc8ocngn24pej827.apps.googleusercontent.com"
-             data-callback="handleCredentialResponse">
-        </div>
+             data-callback="handleCredentialResponse"></div>
         <div class="g_id_signin"
-             data-type="standard"
-             data-shape="rectangular"
-             data-theme="outline"
-             data-text="signin_with"
-             data-size="large"
-             data-logo_alignment="left">
-        </div>
+             data-type="standard" data-shape="rectangular" data-theme="outline"
+             data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
         <div class="meta" id="signedInAs">Not signed in</div>
+        <button id="signOutBtn" class="secondary" style="display:none;">Sign Out</button>
       </div>
     </div>
 
@@ -104,8 +92,21 @@
           </select>
         </div>
         <div>
-          <label>Client Email (fills after sign-in)</label>
+          <label>Shared Drive (choose for “Shared Drive”)</label>
+          <select id="sharedDriveSelect">
+            <option value="">Loading…</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <label>Client Email</label>
           <input id="clientEmail" placeholder="" readonly>
+        </div>
+        <div>
+          <label>Backend URL</label>
+          <input id="urlEcho" readonly>
         </div>
       </div>
 
@@ -118,15 +119,10 @@
         <button class="secondary" id="sendTest">Send Test Row</button>
       </div>
     </div>
-
-    <div class="card">
-      <div class="meta">Backend URL: <code id="urlEcho"></code></div>
-    </div>
   </div>
 
   <div id="toast"></div>
 
-  <!-- App logic -->
   <script src="app.js" defer></script>
 </body>
 </html>
